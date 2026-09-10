@@ -4,55 +4,60 @@ Shared instructions for coding agents. Project-specific information is kept in [
 
 ## Docker
 
-### Repository and environment
+### Repository layout and Docker targets
 
-Repository builds Linux and Windows variants of one Docker image. Shared build inputs live in `common/`; platform inputs live in `linux/` and `windows/`. Both builds use repository root as build context.
+This repository builds Linux and Windows variants of the same image. Shared build inputs belong in `common/`; platform-specific inputs belong in `linux/` or `windows/`. Both variants use the repository root as their build context.
 
-Always pass `--context linux` or `--context windows` to Docker commands. Never rely on active context. Root `.env` is authoritative for image name, test args, and test command. Use `docker context ls` to discover other daemons available via network.
+Always select Docker daemons explicitly: use `--context linux` or `--context windows` for local work, and the named contexts required by the release cycle for remote validation. Treat the root `.env` as authoritative for the image name, test arguments, and test command. Use `docker context ls` to discover other registered daemons; verify a daemon before relying on it.
 
-Only images under disposable `tmp/` namespace may be built, tagged, overwritten, or removed. Treat every other image as read-only.
+Build, tag, overwrite, or remove only images in the disposable `tmp/` namespace. Treat images in every other namespace as published artifacts. The release cycle may pull `faulo/` images for final verification, but agents must not build or retag them locally.
 
-### Batch entry points
+### Entry points and implementation
 
-Root batch scripts are interactive Windows Explorer entry points and pause for output visibility. For agent automation, construct Docker commands directly instead of invoking pausing batch files.
+Keep Dockerfile comments focused on non-obvious constraints and reasons. Preserve each file's shell conventions: PowerShell in Windows Dockerfiles, POSIX shell in Linux Dockerfiles, and batch in `.bat` files.
+
+Prefer rolling updates of dependencies over pinned and checksummed versions. Preserve native exit-code checks, and explicit error handling.
+
+Use the Idea MCP to inspect source files for warnings and optimizations. Lint the code.
+
+Use the patterns in `C:\Webserver\dockerfile-templates` when applicable.
+
+Update `README.md` whenever image contents, prerequisites, or public commands change.
 
 ### Build and validation
 
-Builds are generally large, network-dependent, and may require matching Windows host. Report skipped targets and concrete reasons. Preserve checksum verification, download validation, native exit-code checks, and explicit error handling.
+Builds can be large, network-dependent, and platform-specific. A Windows image requires a compatible Windows daemon. Run every applicable target, but do not conceal unavailable coverage: report each skipped target and the concrete reason it could not run.
 
-### Documentation and style
+### Release cycle
 
-Keep Dockerfile comments focused on non-obvious reasons. Preserve file shell: PowerShell for Windows Dockerfile, POSIX shell for Linux Dockerfile, batch for `.bat`. Keep tool versions and checksums near constrained installation logic. Update `README.md` when image contents, prerequisites, or public commands change.
+When the user has authorized the required release, Git, CI, and deployment operations, complete every phase in order.
 
-### Release
+#### Phase 1: Establish the design contract
 
-When release operations are authorized, the complete release cycle is:
+1. Add or update the integration coverage in `.jenkins/Jenkinsfile.groovy` so it expresses the intended behavior.
+2. Commit and push the test contract without the implementation.
+3. Run this image's job under `https://ci.slothsoft.net/job/jenkins/` with `DOCKER_NAMESPACE=faulo`, and inspect the complete console log.
+4. The new coverage must fail against the currently published image for the intended reason. If it passes, strengthen the contract and repeat this phase.
+5. Do not proceed on an infrastructure failure or unrelated regression; establish the expected product failure first.
 
-#### Phase 1: Design Contract
+#### Phase 2: Build and validate the candidate
 
-1. Review the tests in `.jenkins/Jenkinsfile.groovy` and update them as needed so that they expect the feature to be written.
-2. Commit and push the tests.
-3. Run this plugin's job in `https://ci.slothsoft.net/job/jenkins/` via MCP and with `DOCKER_NAMESPACE` set to `faulo` and watch its complete console log.
-4. If the integration tests pass, repeat from step 1 to make them show the defect.
-5. After integration tests fail, move on to the next phase.
+1. Implement the change and run the applicable local tests.
+2. Build candidate images in the `tmp` namespace on Docker context `dende` for Windows and `garl` for Linux.
+3. Run this image's Jenkins job with `DOCKER_NAMESPACE=tmp`, and inspect the complete console log.
+4. If the candidate fails, fix it, rebuild both applicable candidate images, and repeat the integration run.
+5. Proceed only after the complete candidate integration run passes.
 
-#### Phase 2: Implementation
+#### Phase 3: Publish and revalidate
 
-1. Implement the feature using the local test suite to unit test as applicable.
-2. Build candidate images (using the `tmp` namespace) on docker context `dende` (Windows) and `garl` (Linux).
-3. Run this image's job in `https://ci.slothsoft.net/job/jenkins/` via MCP and with `DOCKER_NAMESPACE` set to `tmp` and watch its complete console log.
-4. If the integration tests fail, repeat from step 1 to fix the issue.
-5. After integration tests pass, move on to the next phase.
+1. Commit and push the implementation, then watch the complete GitHub CI image build.
+2. If GitHub CI fails, fix the issue and revalidate the candidate from Phase 2 before pushing the correction.
+3. After GitHub CI passes, pull the newly published `faulo` images on Docker contexts `dende` and `garl`.
+4. Run this image's Jenkins job with `DOCKER_NAMESPACE=faulo`, and inspect the complete console log.
+5. If publication or final integration fails, fix the issue and repeat the full cycle from Phase 1.
+6. If the feature was based on a ticket, update the ticket's body to reflect the shipped design and mark it complete.
 
-#### Phase 3: Shipping
-
-1. Commit and push the changes, then watch the GitHub CI image build.
-2. If GitHub CI fails, fix the issue, then repeat from step 1.
-3. After GitHub CI passes, pull the newly-built images (now in the `faulo` namespace) on docker context `dende` and `garl`.
-4. Run this plugin's job in `https://ci.slothsoft.net/job/jenkins/` via MCP and with `DOCKER_NAMESPACE` set to `faulo` and watch its complete console log.
-5. If any post-push check or final integration test fails, fix the issue and repeat the full cycle from Phase 1.
-
-If the design contract changes at any point, repeat from Phase 1, step 1.
+If the expected behavior or its test contract changes at any point, restart at Phase 1, step 1.
 
 ## General
 
