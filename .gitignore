@@ -7,3 +7,11 @@ $RECYCLE.BIN/
 # == .NET ==
 **/bin/
 **/obj/
+
+# == Java ==
+**/target/
+out/
+
+# == DevOps ==
+.ai/
+.reports/

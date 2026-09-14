@@ -54,7 +54,7 @@ The Windows image uses the full Windows container base so Unity packages can
 access desktop WinRT APIs. It additionally provides:
 
 - Chocolatey.
-- PowerShell 7.6.4 as `pwsh`.
+- The latest stable PowerShell 7 release as `pwsh`.
 - Visual Studio 2019 Build Tools and .NET Framework 4.7.1 reference
   assemblies.
 - Visual C++ 2010, 2013, and 2015-2022 runtimes required by Unity's native
@@ -67,7 +67,7 @@ Windows-specific build arguments are:
 | Argument | Default | Purpose |
 | --- | --- | --- |
 | `OS_BASE` | `ltsc2019` | Selects the supported Windows LTSC 2019 base. Legacy `20H2` build inputs are retained as implementation reference only. |
-| `POWERSHELL_VERSION` | `7.6.4` | Selects the installed PowerShell release. |
+| `POWERSHELL_MAJOR` | `7` | Selects the stable PowerShell major release line. |
 
 ## Repository Layout
 

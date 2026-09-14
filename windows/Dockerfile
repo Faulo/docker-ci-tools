@@ -1,4 +1,20 @@
 ARG OS_BASE=ltsc2019
+FROM mcr.microsoft.com/dotnet/sdk:9.0-nanoserver-1809 AS build
+
+WORKDIR C:/solution
+
+ENV NUGET_PACKAGES=C:/nuget/packages
+
+COPY . .
+
+RUN dotnet publish \
+        --configuration Release \
+        --runtime win-x64 \
+        --self-contained true \
+        --property:PublishSingleFile=true \
+        --property:UseAppHost=true \
+        --property:DebugType=None
+
 FROM mcr.microsoft.com/windows:${OS_BASE}
 
 ARG OS_BASE
@@ -255,32 +271,20 @@ ENV UNITY_NO_GRAPHICS="1"
 
 # Windows containers cannot start Electron's sandboxed GPU process. Keep Unity's
 # documented CLI syntax externally and translate it before launching Hub.
-COPY windows/UnityHub C:/compose-unity/UnityHub
-COPY windows/SteamCmd C:/compose-unity/SteamCmd
-COPY common/ComposeUnity C:/compose-unity/compose-unity
-RUN $hubPublish = 'C:\compose-unity\publish-hub'; \
-    $steamCmdPublish = 'C:\compose-unity\publish-steamcmd'; \
-    $composePublish = 'C:\compose-unity\publish-compose'; \
-    dotnet publish C:\compose-unity\UnityHub\UnityHub.csproj --nologo --configuration Release --output $hubPublish ('-p:ComposeUnityTargetFramework=net' + $env:DOTNET_VERSION) -p:RuntimeIdentifier=win-x64; \
-    if ($LASTEXITCODE -ne 0) { throw 'Failed to publish the Unity Hub launcher' }; \
-    dotnet publish C:\compose-unity\SteamCmd\SteamCmd.csproj --nologo --configuration Release --output $steamCmdPublish ('-p:ComposeUnityTargetFramework=net' + $env:DOTNET_VERSION) -p:RuntimeIdentifier=win-x64; \
-    if ($LASTEXITCODE -ne 0) { throw 'Failed to publish the SteamCMD launcher' }; \
-    dotnet publish C:\compose-unity\compose-unity\ComposeUnity.csproj --nologo --configuration Release --output $composePublish ('-p:ComposeUnityTargetFramework=net' + $env:DOTNET_VERSION) -p:RuntimeIdentifier=win-x64; \
-    if ($LASTEXITCODE -ne 0) { throw 'Failed to publish the compose-unity launcher' }; \
-    $hubArtifacts = @(Get-ChildItem -LiteralPath $hubPublish -File); \
-    if ($hubArtifacts.Count -ne 1 -or $hubArtifacts[0].Name -ne 'unity-hub-launcher.exe') { throw 'Unity Hub launcher publish did not produce exactly one executable' }; \
-    $steamCmdArtifacts = @(Get-ChildItem -LiteralPath $steamCmdPublish -File); \
-    if ($steamCmdArtifacts.Count -ne 1 -or $steamCmdArtifacts[0].Name -ne 'steamcmd.exe') { throw 'SteamCMD launcher publish did not produce exactly one executable' }; \
-    $composeArtifacts = @(Get-ChildItem -LiteralPath $composePublish -File); \
-    if ($composeArtifacts.Count -ne 1 -or $composeArtifacts[0].Name -ne 'compose-unity.exe') { throw 'compose-unity launcher publish did not produce exactly one executable' }; \
+COPY --from=build C:/solution/windows/UnityHub/bin/Release/net9.0/win-x64/publish/unity-hub-launcher.exe C:/compose-unity/publish/unity-hub-launcher.exe
+COPY --from=build C:/solution/windows/SteamCmd/bin/Release/net9.0/win-x64/publish/steamcmd.exe C:/compose-unity/publish/steamcmd.exe
+COPY --from=build C:/solution/common/ComposeUnity/bin/Release/net9.0/win-x64/publish/compose-unity.exe C:/compose-unity/publish/compose-unity.exe
+RUN $hubArtifact = 'C:\compose-unity\publish\unity-hub-launcher.exe'; \
+    $steamCmdArtifact = 'C:\compose-unity\publish\steamcmd.exe'; \
+    $composeArtifact = 'C:\compose-unity\publish\compose-unity.exe'; \
     $hub = 'C:\Program Files\Unity Hub\Unity Hub.exe'; \
     Move-Item -LiteralPath $hub -Destination 'C:\Program Files\Unity Hub\Unity Hub.real.exe'; \
-    Move-Item -LiteralPath $hubArtifacts[0].FullName -Destination $hub; \
+    Move-Item -LiteralPath $hubArtifact -Destination $hub; \
     New-Item -ItemType Directory -Path C:\steamcmd | Out-Null; \
-    Move-Item -LiteralPath $steamCmdArtifacts[0].FullName -Destination C:\steamcmd\steamcmd.exe; \
-    Copy-Item -LiteralPath $composeArtifacts[0].FullName -Destination C:\Windows\compose-unity.exe; \
+    Move-Item -LiteralPath $steamCmdArtifact -Destination C:\steamcmd\steamcmd.exe; \
+    Copy-Item -LiteralPath $composeArtifact -Destination C:\Windows\compose-unity.exe; \
     New-Item -ItemType HardLink -Path C:\Windows\compose-unity-sidecar.exe -Target C:\Windows\compose-unity.exe | Out-Null; \
-    Remove-Item -LiteralPath C:\compose-unity\UnityHub, C:\compose-unity\SteamCmd, C:\compose-unity\compose-unity, $hubPublish, $steamCmdPublish, $composePublish -Recurse -Force
+    Remove-Item -LiteralPath C:\compose-unity\publish -Recurse -Force
 
 RUN $archive = 'C:\steamcmd.zip'; \
     Invoke-WebRequest -Uri 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip' -OutFile $archive; \
@@ -315,17 +319,40 @@ RUN compose-unity exec unity-build; \
     Remove-Item -LiteralPath C:\ProgramData\compose-unity -Recurse -Force
 
 # PowerShell
-ARG POWERSHELL_VERSION=7.6.4
-ADD https://github.com/PowerShell/PowerShell/releases/download/v${POWERSHELL_VERSION}/PowerShell-${POWERSHELL_VERSION}-win-x64.zip C:/powershell.zip
-RUN $archive = 'C:/powershell.zip'; \
+ARG POWERSHELL_MAJOR=7
+
+ADD https://api.github.com/repos/PowerShell/PowerShell/releases?per_page=100 C:/powershell-releases.json
+
+RUN $releases = Get-Content C:/powershell-releases.json -Raw | ConvertFrom-Json; \
+    $release = $releases | \
+      Where-Object { -not $_.draft -and -not $_.prerelease -and $_.tag_name -match ('^v' + $env:POWERSHELL_MAJOR + '\.\d+\.\d+$') } | \
+      Sort-Object { [version]$_.tag_name.Substring(1) } | \
+      Select-Object -Last 1; \
+    if (-not $release) { throw ('No stable PowerShell ' + $env:POWERSHELL_MAJOR + ' release found') }; \
+    $powershellVersion = $release.tag_name.Substring(1); \
+    $archiveName = 'PowerShell-' + $powershellVersion + '-win-x64.zip'; \
+    $archive = 'C:/' + $archiveName; \
+    $asset = $release.assets | Where-Object name -eq $archiveName; \
+    $hashesAsset = $release.assets | Where-Object name -eq 'hashes.sha256'; \
+    if (-not $asset -or -not $hashesAsset) { throw ('PowerShell ' + $powershellVersion + ' release assets are incomplete') }; \
+    curl.exe -fsSL $asset.browser_download_url -o $archive; \
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to download PowerShell' }; \
+    curl.exe -fsSL $hashesAsset.browser_download_url -o C:/powershell-hashes; \
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to download PowerShell hashes' }; \
+    $hashLine = Get-Content C:/powershell-hashes | Where-Object { $_ -match ('\*' + [regex]::Escape($archiveName) + '$') }; \
+    if (-not $hashLine) { throw ('No checksum found for ' + $archiveName) }; \
+    $expectedHash = ($hashLine -split '\s+')[0]; \
+    $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash; \
+    if ($actualHash -ne $expectedHash) { throw ('Checksum verification failed for ' + $archiveName) }; \
     $destination = 'C:/Program Files/PowerShell/7'; \
     New-Item -ItemType Directory -Force $destination | Out-Null; \
     Expand-Archive -LiteralPath $archive -DestinationPath $destination; \
-    Remove-Item -LiteralPath $archive; \
+    Remove-Item -LiteralPath $archive,C:/powershell-hashes,C:/powershell-releases.json; \
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine'); \
-    [Environment]::SetEnvironmentVariable('Path', ($destination + ';' + $machinePath), 'Machine')
-RUN pwsh.exe -NoLogo -NoProfile -Command \
-        'if ($PSVersionTable.PSVersion.ToString() -ne $env:POWERSHELL_VERSION) { exit 1 }'; \
+    [Environment]::SetEnvironmentVariable('Path', ($destination + ';' + $machinePath), 'Machine'); \
+    $env:Path = $destination + ';' + $env:Path; \
+    pwsh -NoLogo -NoProfile -Command \
+        'if ($PSVersionTable.PSVersion.Major -ne [int]$env:POWERSHELL_MAJOR) { exit 1 }'; \
     if ($LASTEXITCODE -ne 0) { throw 'PowerShell smoke check failed' }
 
 VOLUME ["C:/Program Files/Unity/Hub/Editor", "C:/steam", "C:/Users/ContainerAdministrator/AppData/Roaming/Unity", "C:/Users/ContainerAdministrator/AppData/Roaming/UnityHub", "C:/Users/ContainerAdministrator/AppData/Local/Unity", "C:/ProgramData/Unity"]

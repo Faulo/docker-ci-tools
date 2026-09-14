@@ -1,3 +1,25 @@
+FROM mcr.microsoft.com/dotnet/sdk:9.0-bookworm-slim AS build
+
+ARG TARGETARCH
+
+WORKDIR /solution
+
+COPY . .
+
+RUN set -eux; \
+    case "$TARGETARCH" in \
+      amd64) runtime_id="linux-x64" ;; \
+      arm64) runtime_id="linux-arm64" ;; \
+      *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    dotnet publish \
+        --configuration Release \
+        --runtime "$runtime_id" \
+        --self-contained true \
+        --property:PublishSingleFile=true \
+        --property:UseAppHost=true \
+        --property:DebugType=None
+
 FROM debian:bookworm-slim AS steamcmd-installer
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -180,10 +202,11 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Unity 2021 OpenSSL compatibility
+# Unity 2021 OpenSSL compatibility. Bullseye security is retained only for the
+# legacy library and may publish expired metadata after its security lifecycle.
 RUN echo "deb https://security.debian.org/debian-security bullseye-security main" \
         > /etc/apt/sources.list.d/bullseye-security.list && \
-    apt-get update && \
+    apt-get -o Acquire::Check-Valid-Until=false update && \
     apt-get install -y --no-install-recommends libssl1.1 && \
     rm /etc/apt/sources.list.d/bullseye-security.list && \
     apt-get clean && \
@@ -198,23 +221,8 @@ ENV UNITY_ACCELERATOR_ENDPOINT=""
 ENV UNITY_NO_GRAPHICS="1"
 
 COPY --chmod=755 --from=composer:2 /usr/bin/composer /usr/local/bin/composer
-COPY common/ComposeUnity /tmp/compose-unity
-RUN set -eux; \
-    case "$(dpkg --print-architecture)" in \
-      amd64) runtime_id="linux-x64" ;; \
-      arm64) runtime_id="linux-arm64" ;; \
-      *) echo "Unsupported architecture: $(dpkg --print-architecture)" >&2; exit 1 ;; \
-    esac; \
-    dotnet publish /tmp/compose-unity/ComposeUnity.csproj \
-        --nologo \
-        --configuration Release \
-        --output /tmp/compose-unity/publish \
-        -p:ComposeUnityTargetFramework="net${DOTNET_VERSION}" \
-        -p:RuntimeIdentifier="$runtime_id"; \
-    test "$(find /tmp/compose-unity/publish -maxdepth 1 -type f | wc -l)" -eq 1; \
-    install -m 0755 /tmp/compose-unity/publish/compose-unity /usr/local/bin/compose-unity; \
-    ln -s compose-unity /usr/local/bin/compose-unity-sidecar; \
-    rm -rf /tmp/compose-unity
+COPY --chmod=755 --from=build /solution/common/ComposeUnity/bin/Release/net9.0/linux-*/publish/compose-unity /usr/local/bin/compose-unity
+RUN ln -s compose-unity /usr/local/bin/compose-unity-sidecar
 
 ENV COMPOSE_UNITY_CALL_TIMEOUT="86400"
 ENV COMPOSE_UNITY_MCP="0"
