@@ -29,14 +29,14 @@ def requiredProperty(config, name) {
     return value
 }
 
-def commaSeparated(value) {
+def spaceSeparated(value) {
     return value
         ? value.split(' ').collect { it.trim() }.findAll { it }
         : []
 }
 
 def parseCredentialPairs(value, description, bindingFactory) {
-    return commaSeparated(value).collect { entry ->
+    return spaceSeparated(value).collect { entry ->
         def parts = entry.split('\\|', 2)
         if (parts.size() != 2 || !parts[0].trim() || !parts[1].trim()) {
             error "Invalid ${description} credential binding '${entry}'; expected variable|credential-id"
@@ -75,8 +75,8 @@ def withOptionalCredentials(bindings, Closure body) {
 }
 
 def pesterProject(config) {
-    def targets = commaSeparated(requiredProperty(config, 'targets'))
-    def variants = commaSeparated(requiredProperty(config, 'variants'))
+    def targets = spaceSeparated(requiredProperty(config, 'targets'))
+    def variants = spaceSeparated(requiredProperty(config, 'variants'))
     def timeoutMinutes = (config.timeoutMinutes?.trim() ?: '60') as Integer
     def bindings = credentialBindings(config)
 
@@ -97,11 +97,9 @@ def pesterProject(config) {
 
                 withEnvFile {
                     for (def variant in variants) {
-                        def safeTarget = target.replaceAll('[^A-Za-z0-9_.-]+', '-')
-                        def safeVariant = variant.replaceAll('[^A-Za-z0-9_.-]+', '-')
-                        def resultsPath = ".reports/pester-${safeTarget}-${os}-${safeVariant}.xml"
-
                         def image = "${env.DOCKER_NAMESPACE}/${env.DOCKER_IMAGE}:${variant}"
+                        def safeImage = image.replaceAll('[^A-Za-z0-9_.-]+', '-')
+                        def resultsPath = ".reports/${safeImage}-${os}.xml"
 
                         withOptionalCredentials(bindings) {
                             stage(image) {
