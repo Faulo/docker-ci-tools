@@ -88,8 +88,17 @@ RUN if ($env:DOTNET_VERSION -notmatch '^\d+\.\d+$') { throw "Invalid .NET SDK fe
     $packageSpec.Save((Resolve-Path -LiteralPath compose-unity.nuspec)); \
     choco pack compose-unity.nuspec; \
     if ($LASTEXITCODE -ne 0) { throw 'Failed to pack compose-unity' }; \
-    choco install compose-unity --no-progress --yes --ignore-checksums --execution-timeout=7200 --source '.;https://community.chocolatey.org/api/v2/'; \
-    if ($LASTEXITCODE -ne 0) { throw 'Failed to install compose-unity dependencies' }; \
+    $dependencyInstallSucceeded = $false; \
+    for ($attempt = 1; $attempt -le 5; $attempt++) { \
+        choco install compose-unity --no-progress --yes --ignore-checksums --execution-timeout=7200 --source '.;https://community.chocolatey.org/api/v2/'; \
+        if ($LASTEXITCODE -eq 0) { \
+            $dependencyInstallSucceeded = $true; \
+            break \
+        }; \
+        Write-Warning "Chocolatey dependency installation attempt $attempt failed"; \
+        if ($attempt -lt 5) { Start-Sleep -Seconds (30 * $attempt) } \
+    }; \
+    if (-not $dependencyInstallSucceeded) { throw 'Failed to install compose-unity dependencies after 5 attempts' }; \
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine'); \
     $env:PATH = $machinePath; \
     $installedSdkVersion = dotnet --version; \
