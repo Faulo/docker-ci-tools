@@ -36,6 +36,94 @@ BeforeAll {
     . (Join-Path $PSScriptRoot '../.jenkins/Docker.ps1')
 }
 
+Describe "Docker image command contract [$Os, $Image]" {
+    BeforeAll {
+        $imageConfig = Invoke-DockerOutput -Context $Context -Arguments @(
+            'image', 'inspect', '--format', '{{json .Config}}', $Image
+        ) | ConvertFrom-Json
+        $entrypoint = @()
+        $entrypointProperty = $imageConfig.PSObject.Properties['Entrypoint']
+        if ($null -ne $entrypointProperty) {
+            $entrypoint = @($entrypointProperty.Value)
+        }
+        $defaultCommand = @()
+        $commandProperty = $imageConfig.PSObject.Properties['Cmd']
+        if ($null -ne $commandProperty) {
+            $defaultCommand = @($commandProperty.Value)
+        }
+        $keeperCommand = if ($Os -eq 'windows') { 'cmd.exe' } else { 'cat' }
+        $foreignCommand = if ($Os -eq 'windows') {
+            @('cmd.exe', '/S', '/C', 'exit 0')
+        } else {
+            @('sh', '-c', 'exit 0')
+        }
+    }
+
+    It 'does not declare an entrypoint' {
+        $entrypoint.Count | Should -Be 0
+    }
+
+    It 'declares the exact default sidecar command' {
+        $defaultCommand.Count | Should -Be 2
+        $defaultCommand[0] | Should -BeExactly 'compose-unity'
+        $defaultCommand[1] | Should -BeExactly 'sidecar'
+    }
+
+    It 'allows an arbitrary command to replace the default command' {
+        Invoke-Docker -Context $Context -RunArguments $DockerRunArguments -Arguments (@(
+            'run', '--rm', $Image
+        ) + $foreignCommand)
+    }
+
+    It 'keeps the Docker Pipeline keeper running' {
+        $containerName = "compose-unity-keeper-$([guid]::NewGuid().ToString('N'))"
+
+        try {
+            Invoke-Docker -Context $Context -RunArguments $DockerRunArguments -Arguments @(
+                'run', '--detach', '--tty', '--name', $containerName, $Image, $keeperCommand
+            )
+
+            $running = Invoke-DockerOutput -Context $Context -Arguments @(
+                'container', 'inspect', '--format', '{{.State.Running}}', $containerName
+            )
+            $running | Should -BeExactly 'true'
+        } finally {
+            Get-DockerCommandResult -Context $Context -Arguments @(
+                'container', 'rm', '--force', $containerName
+            ) | Out-Null
+        }
+    }
+
+    It 'starts the sidecar when no command is supplied' {
+        $containerName = "compose-unity-sidecar-$([guid]::NewGuid().ToString('N'))"
+
+        try {
+            Invoke-Docker -Context $Context -RunArguments $DockerRunArguments -Arguments @(
+                'run', '--detach', '--name', $containerName, $Image
+            )
+
+            $healthResult = $null
+            for ($attempt = 1; $attempt -le 30; $attempt++) {
+                $healthResult = Get-DockerCommandResult -Context $Context -Arguments @(
+                    'container', 'exec', $containerName, 'compose-unity', 'sidecar', 'health'
+                )
+                if ($healthResult.ExitCode -eq 0) {
+                    break
+                }
+                Start-Sleep -Seconds 1
+            }
+
+            $healthResult.ExitCode | Should -Be 0 -Because (
+                "the default sidecar must become healthy; output: $($healthResult.Output | Out-String)"
+            )
+        } finally {
+            Get-DockerCommandResult -Context $Context -Arguments @(
+                'container', 'rm', '--force', $containerName
+            ) | Out-Null
+        }
+    }
+}
+
 Describe "Unity behavior [$Os, $Image]" {
     Context 'with Unity <UnityVersion>' -ForEach @(
         $unityVersions | ForEach-Object { @{ UnityVersion = $_ } }

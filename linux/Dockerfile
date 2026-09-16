@@ -20,7 +20,7 @@ RUN set -eux; \
         --property:UseAppHost=true \
         --property:DebugType=None
 
-FROM debian:bookworm-slim AS steamcmd-installer
+FROM debian:trixie-slim AS steamcmd-installer
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -39,7 +39,7 @@ RUN set -eux; \
     cd /opt/steamcmd; \
     ./linux64/steamcmd +quit
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -79,7 +79,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libdbus-1-3 \
         libfontconfig1 \
         libfreetype6 \
-        libicu72 && \
+        libicu76 && \
     echo "$LANG UTF-8" > /etc/locale.gen && \
     locale-gen "$LANG" && \
     install -m 0755 -d /etc/apt/keyrings && \
@@ -114,22 +114,28 @@ RUN ln -s /opt/steamcmd/linux64/steamcmd /usr/local/bin/steamcmd && \
     steamcmd +quit
 
 # PHP
-ENV PHP_VERSION=8.2
-RUN apt-get update && \
+ENV PHP_VERSION=8.4
+RUN curl -fsSLo /tmp/debsuryorg-archive-keyring.deb \
+        https://packages.sury.org/debsuryorg-archive-keyring.deb && \
+    dpkg -i /tmp/debsuryorg-archive-keyring.deb && \
+    rm /tmp/debsuryorg-archive-keyring.deb && \
+    echo "deb [signed-by=/usr/share/keyrings/debsuryorg-archive-keyring.gpg] https://packages.sury.org/php/ trixie main" \
+        > /etc/apt/sources.list.d/php.list && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
-        php \
-        php-curl \
-        php-exif \
-        php-imap \
-        php-intl \
-        php-mbstring \
-        php-sockets \
-        php-xml \
-        php-xsl \
-        php-zip && \
+        php8.4-cli \
+        php8.4-common \
+        php8.4-curl \
+        php8.4-imap \
+        php8.4-intl \
+        php8.4-mbstring \
+        php8.4-xml \
+        php8.4-zip && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
-	php --version
+	php --version && \
+    test "$(php -r 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;')" = "$PHP_VERSION" && \
+    php -m | grep -qi '^imap$'
 
 # .NET SDK
 ARG DOTNET_VERSION=9.0
@@ -137,7 +143,7 @@ ENV DOTNET_VERSION="${DOTNET_VERSION}"
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 ENV DOTNET_CLI_UI_LANGUAGE=en
 ENV PATH="/root/.dotnet/tools:${PATH}"
-RUN curl -fsSL https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb && \
+RUN curl -fsSL https://packages.microsoft.com/config/debian/13/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb && \
     dpkg -i /tmp/packages-microsoft-prod.deb && \
     rm /tmp/packages-microsoft-prod.deb && \
     apt-get update && \
@@ -183,16 +189,13 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
         > /etc/apt/sources.list.d/unityhub.list && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        apparmor \
         cpio \
+        desktop-file-utils \
         ffmpeg \
         libasound2 \
         libc6-dev \
         libgbm-dev \
-        libgconf-2-4 \
         libglu1-mesa \
-        libncurses5 \
-        libtinfo5 \
         p7zip-full \
         python3 \
         unityhub=3.12.1 \
@@ -202,11 +205,23 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Legacy Unity editor compatibility. These libraries were removed in Trixie,
+# so only their Bookworm packages are sourced from Debian Snapshot.
+ARG BOOKWORM_SNAPSHOT=20260615T025018Z
+RUN echo "deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/${BOOKWORM_SNAPSHOT}/ bookworm main" \
+        > /etc/apt/sources.list.d/bookworm.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends libgconf-2-4 libncurses5 libtinfo5 && \
+    rm /etc/apt/sources.list.d/bookworm.list && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 # Unity 2021 OpenSSL compatibility. Bullseye security is retained only for the
-# legacy library and may publish expired metadata after its security lifecycle.
-RUN echo "deb https://security.debian.org/debian-security bullseye-security main" \
+# legacy library, whose final package is available from Debian Snapshot.
+ARG BULLSEYE_SECURITY_SNAPSHOT=20260615T025018Z
+RUN echo "deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/${BULLSEYE_SECURITY_SNAPSHOT}/ bullseye-security main" \
         > /etc/apt/sources.list.d/bullseye-security.list && \
-    apt-get -o Acquire::Check-Valid-Until=false update && \
+    apt-get update && \
     apt-get install -y --no-install-recommends libssl1.1 && \
     rm /etc/apt/sources.list.d/bullseye-security.list && \
     apt-get clean && \

@@ -360,6 +360,6 @@ VOLUME ["C:/Program Files/Unity/Hub/Editor", "C:/steam", "C:/Users/ContainerAdmi
 EXPOSE 8080
 
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
-    CMD ["compose-unity.exe", "sidecar", "health"]
+    CMD ["compose-unity", "sidecar", "health"]
 
-CMD ["compose-unity.exe", "sidecar"]
+CMD ["compose-unity", "sidecar"]

@@ -18,7 +18,7 @@ Both image variants provide:
 - The itch.io Butler client.
 - SteamCMD.
 - Blender 4.5.
-- PHP 8.2.
+- PHP (8.4 on Linux and 8.2 on Windows).
 - .NET SDK 9 and DocFX.
 - Git and Git LFS.
 - Python 3.
@@ -36,7 +36,7 @@ The following build arguments are shared by both variants:
 
 ### Linux
 
-The Linux image is based on Debian Bookworm Slim and additionally provides:
+The Linux image is based on Debian Trixie Slim and additionally provides:
 
 - Xvfb and X authentication tools for headless editor execution.
 - ICU for the .NET-based Unity Licensing Client.
@@ -46,6 +46,8 @@ Linux-specific build arguments are:
 
 | Argument | Default | Purpose |
 | --- | --- | --- |
+| `BOOKWORM_SNAPSHOT` | `20260615T025018Z` | Selects the archived Bookworm snapshot that supplies legacy editor libraries removed in Trixie. |
+| `BULLSEYE_SECURITY_SNAPSHOT` | `20260615T025018Z` | Selects the archived Bullseye Security snapshot that supplies OpenSSL 1.1 for Unity 2021. |
 | `DEBIAN_FRONTEND` | `noninteractive` | Keeps Debian package installation non-interactive during the build. |
 
 ### Windows
@@ -203,6 +205,22 @@ are used by the one-off `steam-login` command.
 
 With no explicit command, the image starts `compose-unity sidecar` as PID 1.
 That sidecar can be utilized by the `withUnity` command of [jenkins-unity](https://github.com/Faulo/jenkins-unity).
+
+## Jenkins Docker Pipeline
+
+Both images support the unmodified Jenkins Docker Pipeline `inside` form:
+
+```groovy
+docker.image(image).inside {
+    sh 'something'
+}
+```
+
+The plugin's `cat` keeper on Linux and `cmd.exe` keeper on Windows replace the
+default sidecar command, and subsequent Pipeline steps run through `docker
+exec`. Other explicitly supplied Docker commands likewise replace the complete
+default invocation; use `compose-unity` explicitly when invoking the image
+launcher this way.
 
 ## Optional MCP Server
 
