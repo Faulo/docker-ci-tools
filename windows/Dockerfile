@@ -95,7 +95,7 @@ RUN if ($env:DOTNET_VERSION -notmatch '^\d+\.\d+$') { throw "Invalid .NET SDK fe
             $dependencyInstallSucceeded = $true; \
             break \
         }; \
-        Write-Warning "Chocolatey dependency installation attempt $attempt failed"; \
+        Write-Warning ('Chocolatey dependency installation attempt ' + $attempt + ' failed'); \
         if ($attempt -lt 5) { Start-Sleep -Seconds (30 * $attempt) } \
     }; \
     if (-not $dependencyInstallSucceeded) { throw 'Failed to install compose-unity dependencies after 5 attempts' }; \
