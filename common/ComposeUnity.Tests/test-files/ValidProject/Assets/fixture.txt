@@ -1,1 +1,0 @@
-This directory represents a Unity project's Assets directory.

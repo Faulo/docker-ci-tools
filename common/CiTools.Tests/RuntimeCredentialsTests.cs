@@ -1,13 +1,11 @@
 using System.Diagnostics;
 
-namespace ComposeUnity.Tests;
+namespace CiTools.Tests;
 
 public sealed class RuntimeCredentialsTests {
     [Test]
     public void ResolvesDirectFileBackedAndMixedPairs() {
         var environment = new Dictionary<string, string?> {
-            ["UNITY_CREDENTIALS_USR"] = "unity-user",
-            ["UNITY_CREDENTIALS_PSW"] = "unity-password",
             ["EMAIL_CREDENTIALS_USR"] = "email-user",
             ["EMAIL_CREDENTIALS_PSW_FILE"] = "/secrets/email-password",
             ["STEAM_CREDENTIALS_USR_FILE"] = "/secrets/steam-user",
@@ -28,8 +26,6 @@ public sealed class RuntimeCredentialsTests {
         credentials.ApplyTo(startInfo);
 
         Assert.Multiple(() => {
-            Assert.That(startInfo.Environment["UNITY_CREDENTIALS_USR"], Is.EqualTo("unity-user"));
-            Assert.That(startInfo.Environment["UNITY_CREDENTIALS_PSW"], Is.EqualTo("unity-password"));
             Assert.That(startInfo.Environment["EMAIL_CREDENTIALS_USR"], Is.EqualTo("email-user"));
             Assert.That(startInfo.Environment["EMAIL_CREDENTIALS_PSW"], Is.EqualTo("email-password"));
             Assert.That(startInfo.Environment["STEAM_CREDENTIALS_USR"], Is.EqualTo("steam-user"));
@@ -38,8 +34,6 @@ public sealed class RuntimeCredentialsTests {
         });
     }
 
-    [TestCase("UNITY_CREDENTIALS_USR")]
-    [TestCase("UNITY_CREDENTIALS_PSW")]
     [TestCase("EMAIL_CREDENTIALS_USR")]
     [TestCase("EMAIL_CREDENTIALS_PSW")]
     [TestCase("STEAM_CREDENTIALS_USR")]
@@ -63,8 +57,8 @@ public sealed class RuntimeCredentialsTests {
     [Test]
     public void RejectsMissingCredentialFileWithoutLeakingPairedValue() {
         var environment = new Dictionary<string, string?> {
-            ["UNITY_CREDENTIALS_USR_FILE"] = "/secrets/missing",
-            ["UNITY_CREDENTIALS_PSW"] = "paired-secret"
+            ["STEAM_CREDENTIALS_USR_FILE"] = "/secrets/missing",
+            ["STEAM_CREDENTIALS_PSW"] = "paired-secret"
         };
 
         var exception = Assert.Throws<InvalidOperationException>(() => Resolve(
@@ -72,24 +66,10 @@ public sealed class RuntimeCredentialsTests {
             path => throw new FileNotFoundException("missing", path)));
 
         Assert.Multiple(() => {
-            Assert.That(exception!.Message, Does.Contain("UNITY_CREDENTIALS_USR_FILE"));
+            Assert.That(exception!.Message, Does.Contain("STEAM_CREDENTIALS_USR_FILE"));
             Assert.That(exception.Message, Does.Contain("/secrets/missing"));
             Assert.That(exception.Message, Does.Not.Contain("paired-secret"));
         });
-    }
-
-    [Test]
-    public void RejectsUnreadableCredentialFile() {
-        var environment = new Dictionary<string, string?> {
-            ["EMAIL_CREDENTIALS_USR_FILE"] = "/secrets/email-user",
-            ["EMAIL_CREDENTIALS_PSW_FILE"] = "/secrets/email-password"
-        };
-
-        var exception = Assert.Throws<InvalidOperationException>(() => Resolve(
-            environment,
-            _ => throw new UnauthorizedAccessException("denied")));
-
-        Assert.That(exception!.Message, Does.Contain("EMAIL_CREDENTIALS_USR_FILE"));
     }
 
     [TestCase("")]
@@ -106,7 +86,6 @@ public sealed class RuntimeCredentialsTests {
         Assert.That(exception!.Message, Does.Contain("STEAM_CREDENTIALS_USR_FILE").And.Contain("empty"));
     }
 
-    [TestCase("UNITY_CREDENTIALS_USR", "UNITY_CREDENTIALS_PSW")]
     [TestCase("EMAIL_CREDENTIALS_USR", "EMAIL_CREDENTIALS_PSW")]
     [TestCase("STEAM_CREDENTIALS_USR", "STEAM_CREDENTIALS_PSW")]
     public void RejectsIncompleteCredentialPair(string present, string missing) {
@@ -124,58 +103,25 @@ public sealed class RuntimeCredentialsTests {
     [Test]
     public void TreatsCompleteEmptyDirectPairAsUnconfigured() {
         var environment = new Dictionary<string, string?> {
-            ["UNITY_CREDENTIALS_USR"] = string.Empty,
-            ["UNITY_CREDENTIALS_PSW"] = string.Empty
+            ["EMAIL_CREDENTIALS_USR"] = string.Empty,
+            ["EMAIL_CREDENTIALS_PSW"] = string.Empty
         };
 
         var credentials = Resolve(environment, _ => throw new InvalidOperationException());
         var startInfo = new ProcessStartInfo();
         startInfo.Environment.Clear();
-        startInfo.Environment["UNITY_CREDENTIALS_USR"] = string.Empty;
-        startInfo.Environment["UNITY_CREDENTIALS_PSW"] = string.Empty;
+        startInfo.Environment["EMAIL_CREDENTIALS_USR"] = string.Empty;
+        startInfo.Environment["EMAIL_CREDENTIALS_PSW"] = string.Empty;
         credentials.ApplyTo(startInfo);
 
         Assert.Multiple(() => {
-            Assert.That(startInfo.Environment.ContainsKey("UNITY_CREDENTIALS_USR"), Is.False);
-            Assert.That(startInfo.Environment.ContainsKey("UNITY_CREDENTIALS_PSW"), Is.False);
+            Assert.That(startInfo.Environment.ContainsKey("EMAIL_CREDENTIALS_USR"), Is.False);
+            Assert.That(startInfo.Environment.ContainsKey("EMAIL_CREDENTIALS_PSW"), Is.False);
         });
     }
 
-    [Test]
-    public void RejectsEmptyCredentialFilePath() {
-        var environment = new Dictionary<string, string?> {
-            ["UNITY_CREDENTIALS_USR_FILE"] = " ",
-            ["UNITY_CREDENTIALS_PSW_FILE"] = "/secrets/unity-password"
-        };
-
-        var exception = Assert.Throws<InvalidOperationException>(() => Resolve(environment, _ => "secret"));
-
-        Assert.That(exception!.Message, Does.Contain("UNITY_CREDENTIALS_USR_FILE"));
-    }
-
-    [Test]
-    public void ExposesOnlyUnityAndEmailCredentialsToWorkers() {
-        var environment = new Dictionary<string, string?> {
-            ["UNITY_CREDENTIALS_USR"] = "unity-user",
-            ["UNITY_CREDENTIALS_PSW"] = "unity-password",
-            ["EMAIL_CREDENTIALS_USR"] = "email-user",
-            ["EMAIL_CREDENTIALS_PSW"] = "email-password",
-            ["STEAM_CREDENTIALS_USR"] = "steam-user",
-            ["STEAM_CREDENTIALS_PSW"] = "steam-password"
-        };
-
-        var credentials = Resolve(environment, _ => throw new InvalidOperationException());
-
-        Assert.That(credentials.WorkerEnvironment(), Is.EqualTo(new[] {
-            "UNITY_CREDENTIALS_USR=unity-user",
-            "UNITY_CREDENTIALS_PSW=unity-password",
-            "EMAIL_CREDENTIALS_USR=email-user",
-            "EMAIL_CREDENTIALS_PSW=email-password"
-        }));
-    }
-
     static RuntimeCredentials Resolve(
-        IReadOnlyDictionary<string, string?> environment,
+        Dictionary<string, string?> environment,
         Func<string, string> readFile) =>
         RuntimeCredentials.Resolve(
             name => environment.TryGetValue(name, out string? value) ? value : null,

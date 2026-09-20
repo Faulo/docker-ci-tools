@@ -1,11 +1,10 @@
 using System.Diagnostics;
 using System.Security;
 
-namespace ComposeUnity;
+namespace CiTools;
 
 sealed class RuntimeCredentials {
     static readonly CredentialPair[] pairs = [
-        new("Unity", "UNITY_CREDENTIALS_USR", "UNITY_CREDENTIALS_PSW"),
         new("Email", "EMAIL_CREDENTIALS_USR", "EMAIL_CREDENTIALS_PSW"),
         new("Steam", "STEAM_CREDENTIALS_USR", "STEAM_CREDENTIALS_PSW")
     ];
@@ -45,16 +44,6 @@ sealed class RuntimeCredentials {
             ApplyValue(startInfo.Environment, pair.user);
             ApplyValue(startInfo.Environment, pair.password);
         }
-    }
-
-    internal IReadOnlyList<string> WorkerEnvironment() {
-        var environment = new List<string>();
-        foreach (var pair in pairs.Take(2)) {
-            AddEnvironmentValue(environment, pair.user);
-            AddEnvironmentValue(environment, pair.password);
-        }
-
-        return environment;
     }
 
     static void ResolveValue(
@@ -98,12 +87,6 @@ sealed class RuntimeCredentials {
         environment.Remove(name + "_FILE");
         if (values.TryGetValue(name, out string? value)) {
             environment[name] = value;
-        }
-    }
-
-    void AddEnvironmentValue(ICollection<string> environment, string name) {
-        if (values.TryGetValue(name, out string? value)) {
-            environment.Add($"{name}={value}");
         }
     }
 

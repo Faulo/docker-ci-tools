@@ -8,6 +8,8 @@ on:
             - "common/**"
             - "linux/**"
             - "windows/**"
+            - "tests/**"
+            - ".jenkins/**"
             - ".env"
             - ".github/workflows/docker.yml"
             - "Directory.Build.props"
@@ -35,13 +37,7 @@ jobs:
               with:
                   dotnet-version: 9.0.x
             - name: Run unit tests
-              run: dotnet test common/ComposeUnity.Tests/ComposeUnity.Tests.csproj --nologo --configuration Release --blame-hang-timeout 2m
-            - name: Register Linux Docker context
-              run: docker context create linux --docker host=unix:///var/run/docker.sock
-            - name: Run real-daemon tests
-              run: dotnet test common/ComposeUnity.DaemonTests/ComposeUnity.DaemonTests.csproj --nologo --configuration Release
-              env:
-                  COMPOSE_UNITY_DAEMON_TEST_REQUIRED_OS: linux
+              run: dotnet test common/CiTools.Tests/CiTools.Tests.csproj --nologo --configuration Release --blame-hang-timeout 2m
 
     test-windows:
         runs-on: windows-2022
@@ -53,43 +49,8 @@ jobs:
               uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
               with:
                   dotnet-version: 9.0.x
-            - name: Configure Hyper-V as Docker default isolation
-              shell: pwsh
-              run: |
-                  Stop-Service docker
-                  $configurationPath = Join-Path $env:ProgramData "docker\config\daemon.json"
-                  $configuration = Get-Content -LiteralPath $configurationPath -Raw | ConvertFrom-Json
-                  $configuration | Add-Member -MemberType NoteProperty -Name "exec-opts" `
-                      -Value @("isolation=hyperv") -Force
-                  $json = $configuration | ConvertTo-Json -Depth 10
-                  [IO.File]::WriteAllText(
-                      $configurationPath,
-                      $json,
-                      [Text.UTF8Encoding]::new($false))
-                  Start-Service docker
-                  for ($attempt = 1; $attempt -le 60; $attempt++) {
-                      $isolation = docker info --format "{{.Isolation}}" 2>$null
-                      if ($LASTEXITCODE -eq 0 -and $isolation.Trim() -eq "hyperv") {
-                          exit 0
-                      }
-                      Start-Sleep -Seconds 1
-                  }
-                  throw "Docker did not start with Hyper-V as its default isolation within 60 seconds."
-            - name: Register Windows Docker context
-              shell: pwsh
-              run: |
-                  docker context create windows --docker "host=npipe:////./pipe/docker_engine"
-                  if ($LASTEXITCODE -ne 0) {
-                      throw "Could not register the Windows Docker context."
-                  }
-                  $daemonOs = docker --context windows version --format "{{.Server.Os}}"
-                  if ($LASTEXITCODE -ne 0 -or $daemonOs.Trim() -ne "windows") {
-                      throw "The Windows Docker context is not connected to a Windows daemon: $daemonOs"
-                  }
-            - name: Run Windows real-daemon tests
-              run: dotnet test common/ComposeUnity.DaemonTests/ComposeUnity.DaemonTests.csproj --nologo --configuration Release
-              env:
-                  COMPOSE_UNITY_DAEMON_TEST_REQUIRED_OS: windows
+            - name: Run unit tests
+              run: dotnet test common/CiTools.Tests/CiTools.Tests.csproj --nologo --configuration Release --blame-hang-timeout 2m
 
     configuration:
         needs:
@@ -113,7 +74,9 @@ jobs:
         with:
             image: ${{needs.configuration.outputs.image}}
             linux_context: .
+            linux_platforms: '{"linux/amd64":"ubuntu-24.04"}'
             windows_context: .
+            windows_platforms: '{"windows/amd64":"windows-2022"}'
             windows_variants: >-
                 [
                   {"tag":"windows-ltsc2019","build_args":{"OS_BASE":"ltsc2019"}}

@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CiTools", "common\CiTools\CiTools.csproj", "{F49ED31D-39B5-461B-87B7-279A69745BD7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CiTools.Tests", "common\CiTools.Tests\CiTools.Tests.csproj", "{4185CB83-3D04-4EB3-BEBD-90F433BFA220}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SteamCmd", "windows\SteamCmd\SteamCmd.csproj", "{F2A9B28A-2E42-4A47-9F66-694C674B5E68}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F49ED31D-39B5-461B-87B7-279A69745BD7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F49ED31D-39B5-461B-87B7-279A69745BD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F49ED31D-39B5-461B-87B7-279A69745BD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F49ED31D-39B5-461B-87B7-279A69745BD7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4185CB83-3D04-4EB3-BEBD-90F433BFA220}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4185CB83-3D04-4EB3-BEBD-90F433BFA220}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4185CB83-3D04-4EB3-BEBD-90F433BFA220}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4185CB83-3D04-4EB3-BEBD-90F433BFA220}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F2A9B28A-2E42-4A47-9F66-694C674B5E68}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2A9B28A-2E42-4A47-9F66-694C674B5E68}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2A9B28A-2E42-4A47-9F66-694C674B5E68}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2A9B28A-2E42-4A47-9F66-694C674B5E68}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

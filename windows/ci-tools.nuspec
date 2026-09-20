@@ -1,0 +1,16 @@
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>ci-tools</id>
+    <version>1.0.0</version>
+    <title>Faulo CI Tools</title>
+    <authors>Daniel Schulz</authors>
+    <description>Runtime dependencies for Faulo CI tools.</description>
+    <dependencies>
+      <dependency id="butler" />
+      <dependency id="nodejs" />
+      <dependency id="powershell-core" />
+      <dependency id="php" version="[8.2,8.3)" />
+      <dependency id="composer" />
+    </dependencies>
+  </metadata>
+</package>

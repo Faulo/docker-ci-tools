@@ -5,13 +5,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 
-namespace ComposeUnity.SteamCmd;
+namespace CiTools.SteamCmd;
 
 static class Program {
     const string STEAM_DIRECTORY = @"C:\steam";
     const string INSTALLER_PATH = @"C:\steamcmd\steamcmd-installer.exe";
-    static readonly string SteamCmdPath = Path.Combine(STEAM_DIRECTORY, "steamcmd.exe");
-    static readonly string LockPath = Path.Combine(STEAM_DIRECTORY, ".steamcmd.lock");
+    static readonly string steamCmdPath = Path.Combine(STEAM_DIRECTORY, "steamcmd.exe");
+    static readonly string lockPath = Path.Combine(STEAM_DIRECTORY, ".steamcmd.lock");
 
     public static int Main(string[] args) {
         try {
@@ -37,7 +37,7 @@ static class Program {
     }
 
     static int RunSteamCmd(IEnumerable<string> args) {
-        var startInfo = new ProcessStartInfo(SteamCmdPath) { UseShellExecute = false, WorkingDirectory = Environment.CurrentDirectory };
+        var startInfo = new ProcessStartInfo(steamCmdPath) { UseShellExecute = false, WorkingDirectory = Environment.CurrentDirectory };
         foreach (string argument in args) {
             startInfo.ArgumentList.Add(argument);
         }
@@ -59,7 +59,7 @@ static class Program {
                     try {
                         if (process.Id != Environment.ProcessId
                             && !process.HasExited
-                            && process.MainModule?.FileName.Equals(SteamCmdPath, StringComparison.OrdinalIgnoreCase) == true) {
+                            && process.MainModule?.FileName.Equals(steamCmdPath, StringComparison.OrdinalIgnoreCase) == true) {
                             childFound = true;
                         }
                     } catch (InvalidOperationException) {
@@ -76,7 +76,7 @@ static class Program {
     static FileStream AcquireInvocationLock() {
         while (true) {
             try {
-                return new FileStream(LockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             } catch (IOException) {
                 Thread.Sleep(250);
             }
@@ -84,7 +84,7 @@ static class Program {
     }
 
     static bool EnsureSteamCmdInstalled() {
-        if (IsExecutable(SteamCmdPath)) {
+        if (IsExecutable(steamCmdPath)) {
             return false;
         }
 
@@ -92,14 +92,14 @@ static class Program {
             throw new InvalidDataException($"SteamCMD installer is missing or invalid: {INSTALLER_PATH}");
         }
 
-        if (File.Exists(SteamCmdPath)) {
-            File.Delete(SteamCmdPath);
+        if (File.Exists(steamCmdPath)) {
+            File.Delete(steamCmdPath);
         }
 
         string temporaryPath = Path.Combine(STEAM_DIRECTORY, $".steamcmd-{Guid.NewGuid():N}.tmp");
         try {
             File.Copy(INSTALLER_PATH, temporaryPath);
-            File.Move(temporaryPath, SteamCmdPath);
+            File.Move(temporaryPath, steamCmdPath);
             return true;
         } finally {
             File.Delete(temporaryPath);

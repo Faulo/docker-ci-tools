@@ -1,22 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <ComposeUnityTargetFramework Condition="'$(ComposeUnityTargetFramework)' == ''">net9.0</ComposeUnityTargetFramework>
-        <TargetFramework>$(ComposeUnityTargetFramework)</TargetFramework>
+        <CiToolsTargetFramework Condition="'$(CiToolsTargetFramework)' == ''">net9.0</CiToolsTargetFramework>
+        <TargetFramework>$(CiToolsTargetFramework)</TargetFramework>
         <PublishSingleFile>true</PublishSingleFile>
         <SelfContained>false</SelfContained>
         <DebugType>none</DebugType>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-        <AssemblyName>compose-unity</AssemblyName>
+        <AssemblyName>ci-tools-launcher</AssemblyName>
     </PropertyGroup>
     <ItemGroup>
         <Compile Include="*.cs" />
-        <FrameworkReference Include="Microsoft.AspNetCore.App" />
-        <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.0.0" />
     </ItemGroup>
     <ItemGroup>
-        <InternalsVisibleTo Include="ComposeUnity.Tests" />
+        <InternalsVisibleTo Include="CiTools.Tests" />
     </ItemGroup>
 </Project>
