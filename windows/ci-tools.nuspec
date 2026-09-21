@@ -9,7 +9,7 @@
       <dependency id="butler" />
       <dependency id="nodejs" />
       <dependency id="powershell-core" />
-      <dependency id="php" version="[8.2,8.3)" />
+      <dependency id="php" version="[8.4,8.5)" />
       <dependency id="composer" />
     </dependencies>
   </metadata>

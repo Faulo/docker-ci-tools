@@ -99,11 +99,11 @@ Describe "CI tools image contract [$Os, $Image]" {
         $entrypoint.Count | Should -Be 0
     }
 
-    It 'declares the exact harmless default command' {
+    It 'inherits the platform base image command' {
         $expected = if ($Os -eq 'windows') {
-            @('cmd.exe', '/S', '/C', 'exit 0')
+            @('c:\windows\system32\cmd.exe')
         } else {
-            @('/bin/sh', '-c', 'exit 0')
+            @('bash')
         }
         $defaultCommand | Should -BeExactly $expected
     }
@@ -150,6 +150,14 @@ Describe "CI tools image contract [$Os, $Image]" {
 }
 
 Describe "Public command contract [$Os, $Image]" {
+    It 'provides PHP 8.4' {
+        $result = Invoke-ImageCommand -Command @(
+            'php', '-r', 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;'
+        )
+        $result.ExitCode | Should -Be 0 -Because ($result.Output | Out-String)
+        ($result.Output | Out-String).Trim() | Should -BeExactly '8.4'
+    }
+
     It 'provides all required public commands' {
         $commands = @('butler', 'composer', 'node', 'php', 'steamcmd', 'steam-buildfile', 'steam-login')
         $probe = if ($Os -eq 'windows') {

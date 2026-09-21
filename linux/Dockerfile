@@ -6,13 +6,7 @@ WORKDIR /solution
 
 COPY . .
 
-RUN dotnet publish common/CiTools/CiTools.csproj \
-        --configuration Release \
-        --runtime linux-x64 \
-        --self-contained true \
-        --property:PublishSingleFile=true \
-        --property:UseAppHost=true \
-        --property:DebugType=None
+RUN dotnet publish --runtime linux-x64
 
 FROM node:${NODE_VERSION}-trixie-slim AS node
 
@@ -38,7 +32,6 @@ RUN set -eux; \
 FROM debian:trixie-slim
 
 ARG DEBIAN_FRONTEND=noninteractive
-ARG SLOTHSOFT_UNITY_VERSION=2.22
 ARG TOOL_TIMEOUT=14400
 
 USER root
@@ -90,7 +83,7 @@ COPY --chmod=755 --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 COPY --chmod=755 --from=build /solution/common/CiTools/bin/Release/net9.0/linux-x64/publish/ci-tools-launcher /ci-tools/ci-tools-launcher
 
 RUN cd /ci-tools && \
-    composer require "slothsoft/unity:^${SLOTHSOFT_UNITY_VERSION}" --no-interaction && \
+    composer require "slothsoft/unity" --no-interaction && \
     composer config process-timeout "${TOOL_TIMEOUT}" && \
     composer update --no-interaction --no-dev --optimize-autoloader --classmap-authoritative && \
     composer check-platform-reqs --no-dev && \
@@ -100,5 +93,3 @@ RUN cd /ci-tools && \
     steam-login unexpected-argument | grep -q '^Sign in to Steam via steamcmd\.'
 
 VOLUME ["/root/Steam"]
-
-CMD ["/bin/sh", "-c", "exit 0"]

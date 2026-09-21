@@ -6,21 +6,7 @@ ENV NUGET_PACKAGES=C:/nuget/packages
 
 COPY . .
 
-RUN dotnet publish common/CiTools/CiTools.csproj \
-        --configuration Release \
-        --runtime win-x64 \
-        --self-contained true \
-        --property:PublishSingleFile=true \
-        --property:UseAppHost=true \
-        --property:DebugType=None
-
-RUN dotnet publish windows/SteamCmd/SteamCmd.csproj \
-        --configuration Release \
-        --runtime win-x64 \
-        --self-contained true \
-        --property:PublishSingleFile=true \
-        --property:UseAppHost=true \
-        --property:DebugType=None
+RUN dotnet publish --runtime win-x64
 
 FROM mcr.microsoft.com/windows/servercore:${OS_BASE}
 
@@ -31,22 +17,10 @@ WORKDIR C:/ci-tools
 ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV CI_TOOLS_CALL_TIMEOUT=86400
 
-# Chocolatey 1.4 supports the .NET Framework available in LTSC 2019.
-RUN $archive = 'C:\chocolatey.1.4.0.zip'; \
-    $extractRoot = 'C:\chocolatey.1.4.0'; \
-    Invoke-WebRequest -Uri 'https://community.chocolatey.org/api/v2/package/chocolatey/1.4.0' -OutFile $archive; \
-    $actualHash = (Get-FileHash -Algorithm SHA256 $archive).Hash; \
-    if ($actualHash -ne '1660261EDD358FF5EA84A503CA3F01A24DDB0E281002BD4237B1071289161A26') { \
-        throw ('Chocolatey package checksum mismatch: ' + $actualHash) \
-    }; \
-    Expand-Archive -LiteralPath $archive -DestinationPath $extractRoot; \
-    $env:ChocolateyInstall = 'C:\ProgramData\chocolatey'; \
-    $env:ChocolateyPackageVersion = '1.4.0'; \
-    [Environment]::SetEnvironmentVariable('ChocolateyInstall', $env:ChocolateyInstall, 'Machine'); \
-    & (Join-Path $extractRoot 'tools\chocolateyInstall.ps1'); \
-    Remove-Item -LiteralPath $archive, $extractRoot -Recurse -Force; \
-    choco --version; \
-    if ($LASTEXITCODE -ne 0) { throw 'Failed to install Chocolatey' }
+ARG CHOCOLATEY_VERSION=1.4.0
+RUN $env:chocolateyVersion = $env:CHOCOLATEY_VERSION; \
+    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')); \
+    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) { throw 'Chocolatey installation failed' }
 
 # Runtime tools
 COPY windows/ci-tools.nuspec C:/ci-tools/ci-tools.nuspec
@@ -76,8 +50,16 @@ RUN choco pack C:\ci-tools\ci-tools.nuspec; \
     pwsh -NoLogo -NoProfile -Command '$PSVersionTable.PSVersion'; \
     if ($LASTEXITCODE -ne 0) { throw 'PowerShell smoke check failed' }
 
-COPY windows/php-extensions.ini C:/tools/php82/ci-tools-extensions.ini
-RUN Get-Content C:/tools/php82/ci-tools-extensions.ini | Add-Content -Path C:/tools/php82/php.ini; \
+COPY windows/php-extensions.ini C:/tools/php84/ci-tools-extensions.ini
+RUN $imapVersion = (Invoke-WebRequest -UseBasicParsing 'https://pecl.php.net/rest/r/imap/latest.txt').Content.Trim(); \
+    $imapArchive = 'C:\php-imap.zip'; \
+    $imapRoot = 'C:\php-imap'; \
+    $imapUri = 'https://windows.php.net/downloads/pecl/releases/imap/' + $imapVersion + '/php_imap-' + $imapVersion + '-8.4-nts-vs17-x64.zip'; \
+    Invoke-WebRequest -Uri $imapUri -OutFile $imapArchive; \
+    Expand-Archive -LiteralPath $imapArchive -DestinationPath $imapRoot; \
+    Move-Item -LiteralPath (Join-Path $imapRoot 'php_imap.dll') -Destination C:\tools\php84\ext\php_imap.dll; \
+    Remove-Item -LiteralPath $imapArchive, $imapRoot -Recurse -Force; \
+    Get-Content C:/tools/php84/ci-tools-extensions.ini | Add-Content -Path C:/tools/php84/php.ini; \
     $modules = @(php -m); \
     if ($modules -notcontains 'imap') { throw 'PHP IMAP extension is unavailable' }; \
     if ($modules -notcontains 'xsl') { throw 'PHP XSL extension is unavailable' }
@@ -106,9 +88,8 @@ RUN $archive = 'C:\steamcmd.zip'; \
     if (Test-Path -LiteralPath C:\steam) { throw 'SteamCMD volume directory must not be populated in the image' }
 
 # Composer-backed CI tools
-ARG SLOTHSOFT_UNITY_VERSION=2.22
 ARG TOOL_TIMEOUT=14400
-RUN composer require ('slothsoft/unity:^' + $env:SLOTHSOFT_UNITY_VERSION) --no-interaction; \
+RUN composer require ('slothsoft/unity') --no-interaction; \
     if ($LASTEXITCODE -ne 0) { throw 'Failed to require slothsoft/unity' }; \
     composer config process-timeout $env:TOOL_TIMEOUT; \
     if ($LASTEXITCODE -ne 0) { throw 'Failed to configure the Composer process timeout' }; \
@@ -122,5 +103,3 @@ RUN composer require ('slothsoft/unity:^' + $env:SLOTHSOFT_UNITY_VERSION) --no-i
     if ($LASTEXITCODE -ne 0 -or $loginHelp -notmatch '(?m)^Sign in to Steam via steamcmd\.') { throw 'steam-login smoke check failed' }
 
 VOLUME ["C:/steam"]
-
-CMD ["cmd.exe", "/S", "/C", "exit 0"]

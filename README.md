@@ -28,27 +28,29 @@ Python, FFmpeg, DocFX, and a runtime .NET SDK.
 ## Image behavior
 
 The images declare no `ENTRYPOINT`, so Docker and Jenkins Pipeline can replace
-the complete command. Running the image without a command executes a harmless
-no-op and exits successfully. Jenkins Docker Pipeline keepers remain supported:
-`cat` on Linux and `cmd.exe` on Windows.
+the complete command. Each image retains its base image's default command:
+`bash` on Linux and `cmd.exe` on Windows. Jenkins Docker Pipeline keepers remain
+supported with `cat` on Linux and `cmd.exe` on Windows.
 
-The Linux runtime is based on Debian Trixie Slim. Its apt dependencies are
-declared in `linux/ci-tools.packages`; PowerShell is not installed.
+The Linux runtime is based on Debian Trixie Slim and uses Trixie's PHP 8.4
+release line. Its apt dependencies are declared in `linux/ci-tools.packages`;
+PowerShell is not installed.
 
 The Windows runtime is based on
 `mcr.microsoft.com/windows/servercore:<OS_BASE>`. Its Chocolatey meta-package
-contains Butler, Node.js, PowerShell Core, PHP, and Composer. SteamCMD remains a
-separately downloaded native launcher so it can bootstrap into a mounted
-volume.
+contains Butler, Node.js, PowerShell Core, PHP 8.4, and Composer. SteamCMD
+remains a separately downloaded native launcher so it can bootstrap into a
+mounted volume. Because PHP 8.4 unbundled IMAP, the Windows image installs its
+current official PECL build.
 
 ## Build arguments
 
 | Argument | Default | Purpose |
 | --- | --- | --- |
-| `SLOTHSOFT_UNITY_VERSION` | `2.22` | Selects the Composer backend release. |
 | `TOOL_TIMEOUT` | `14400` | Configures Composer's child-process timeout in seconds. |
 | `NODE_VERSION` | `24` | Selects the Linux Node.js major release. |
 | `OS_BASE` | `ltsc2019` | Selects the Windows Server Core release. |
+| `CHOCOLATEY_VERSION` | `1.4.0` | Selects the Windows Chocolatey bootstrap version. |
 
 At runtime, `CI_TOOLS_CALL_TIMEOUT` limits each Composer-backed launcher call
 and defaults to 86400 seconds. Set it to `0` to disable the launcher deadline.

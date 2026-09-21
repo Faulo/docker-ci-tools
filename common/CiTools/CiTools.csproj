@@ -4,7 +4,7 @@
         <CiToolsTargetFramework Condition="'$(CiToolsTargetFramework)' == ''">net9.0</CiToolsTargetFramework>
         <TargetFramework>$(CiToolsTargetFramework)</TargetFramework>
         <PublishSingleFile>true</PublishSingleFile>
-        <SelfContained>false</SelfContained>
+        <PublishSelfContained>true</PublishSelfContained>
         <DebugType>none</DebugType>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
