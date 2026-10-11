@@ -95,6 +95,26 @@ def pesterProject(config) {
                     deleteDir()
                 }
 
+                stage("Unit Tests: ${target}") {
+                    timeout(time: timeoutMinutes, unit: 'MINUTES') {
+                        def sdkImage = os == 'windows'
+                            ? 'mcr.microsoft.com/dotnet/sdk:9.0-nanoserver-1809'
+                            : 'mcr.microsoft.com/dotnet/sdk:9.0-bookworm-slim'
+                        docker.image(sdkImage).inside {
+                            def command = 'dotnet test common/CiTools.Tests/CiTools.Tests.csproj --nologo --configuration Release --blame-hang-timeout 2m --logger "trx;LogFileName=unit-tests.trx" --results-directory .reports/unit-tests'
+                            try {
+                                if (os == 'windows') {
+                                    bat command
+                                } else {
+                                    sh command
+                                }
+                            } finally {
+                                archiveArtifacts artifacts: '.reports/unit-tests/**', allowEmptyArchive: false
+                            }
+                        }
+                    }
+                }
+
                 withEnvFile {
                     for (def variant in variants) {
                         def image = "${env.DOCKER_NAMESPACE}/${env.DOCKER_IMAGE}:${variant}"

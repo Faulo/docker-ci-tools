@@ -18,6 +18,10 @@ Add project `bin` directories to `PATH`, preserving existing entries. Use shims 
 
 ### Implementation
 
+Use the rolling `faulo/choco:windowsservercore-ltsc2019` image for the Windows runtime and `choco-install` for nuspec dependencies. Keep the SteamCMD bootstrap separate. Native Chocolatey installer failures belong in `Faulo/docker-choco`; report package versions, base digest, host build and isolation, exact commands, sanitized full logs, exit status or timeout, and a fresh-container reproduction. Block the affected release until the shared fix is validated; do not add downstream installer bypasses or compatibility patches.
+
+Docker publishing uses the shared `Faulo/workflows-docker@v3` caller and schema version 2 in `docker.json`, with names resolved from `.env`. Every target publishes a suffixed tag alongside combined `latest`. Project unit and integration tests run in Jenkins. The Windows target uses the rolling Server Core LTSC 2019 tag.
+
 Keep Dockerfile comments focused on non-obvious constraints and reasons. Preserve each file's shell conventions: PowerShell in Windows Dockerfiles, POSIX shell in Linux Dockerfiles, and batch in `.bat` files.
 
 Prefer rolling updates of dependencies over pinned and checksummed versions. Preserve native exit-code checks, and explicit error handling.

@@ -1,155 +1,171 @@
-# CI Tools Docker Image
+# CI tools for Linux and Windows containers
 
-This repository builds Linux x64 and Windows x64 variants of
-`faulo/ci-tools`. The image provides standalone command-line tools used by CI
-jobs without prescribing a build system or long-running container process.
+[`faulo/ci-tools`](https://hub.docker.com/r/faulo/ci-tools) provides command-line
+tools for uploading builds to Steam and itch.io. Run individual commands with
+Docker, use the image in a CI pipeline, or extend it with your own build tools.
 
-## Public commands
+## Available images
 
-Both variants provide:
-
-- `butler`, the itch.io upload client.
-- `steamcmd`, including persistent bootstrap state.
-- `steam-buildfile [ARG...]`, equivalent to
-  `composer exec steam-buildfile -- ARG...`.
-- `steam-login [ARG...]`, equivalent to
-  `composer exec steam-login -- ARG...`.
-
-The Composer-backed commands use `slothsoft/unity` as their implementation
-backend. Their native launcher preserves the caller's working directory,
-argument boundaries, attached standard streams, termination signals, timeout,
-and child exit status.
-
-The image intentionally contains no Unity Hub, Unity editor compatibility
-libraries, Unity licensing state, sidecar, MCP server, worker controller,
-project probe, or WebGL host. It also excludes Git, Git LFS, Nano, Blender,
-Python, FFmpeg, DocFX, and a runtime .NET SDK.
-
-## Image behavior
-
-The images declare no `ENTRYPOINT`, so Docker and Jenkins Pipeline can replace
-the complete command. Each image retains its base image's default command:
-`bash` on Linux and `cmd.exe` on Windows. Jenkins Docker Pipeline keepers remain
-supported with `cat` on Linux and `cmd.exe` on Windows.
-
-The Linux runtime is based on Debian Trixie Slim and uses Trixie's PHP 8.4
-release line. Its apt dependencies are declared in `linux/ci-tools.packages`;
-PowerShell is not installed.
-
-The Windows runtime is based on
-`mcr.microsoft.com/windows/servercore:<OS_BASE>`. Its Chocolatey meta-package
-contains Butler, Node.js, PowerShell Core, PHP 8.4, and Composer. SteamCMD
-remains a separately downloaded native launcher so it can bootstrap into a
-mounted volume. Because PHP 8.4 unbundled IMAP, the Windows image installs its
-current official PECL build.
-
-## Build arguments
-
-| Argument | Default | Purpose |
+| Tag | Platforms | Runtime bases |
 | --- | --- | --- |
-| `TOOL_TIMEOUT` | `14400` | Configures Composer's child-process timeout in seconds. |
-| `NODE_VERSION` | `24` | Selects the Linux Node.js major release. |
-| `OS_BASE` | `ltsc2019` | Selects the Windows Server Core release. |
-| `CHOCOLATEY_VERSION` | `1.4.0` | Selects the Windows Chocolatey bootstrap version. |
+| `latest` | Linux amd64, Windows amd64 | Debian Trixie Slim; Windows Server Core LTSC 2019 through [`faulo/choco`](https://github.com/Faulo/docker-choco) |
+| `latest-linux-amd64` | Linux amd64 | Debian Trixie Slim |
+| `latest-windows-ltsc2019` | Windows amd64 | Windows Server Core LTSC 2019 through `faulo/choco` |
 
-At runtime, `CI_TOOLS_CALL_TIMEOUT` limits each Composer-backed launcher call
-and defaults to 86400 seconds. Set it to `0` to disable the launcher deadline.
+Docker selects the platform matching your daemon. Windows containers require a
+compatible Windows host. Pin an individual image digest when you need an exact
+image. Images are rebuilt monthly to pick up dependency updates.
 
-## Steam state
+Use `latest` for automatic platform selection, or a target-specific tag to
+select Linux amd64 or Windows LTSC 2019 explicitly. Other historical platform
+and LTSC suffix tags are no longer updated.
 
-Mount the platform Steam state directory to preserve SteamCMD downloads and
-authentication state:
+## Included tools
 
-Linux:
+| Command | Purpose |
+| --- | --- |
+| `butler` | Upload builds to itch.io. |
+| `steamcmd` | Download and publish Steam content. |
+| `steam-buildfile [ARG...]` | Generate a Steam app-build VDF. |
+| `steam-login [ARG...]` | Sign in to Steam using Steam and mailbox credentials. |
+| `php`, `composer`, `node` | Runtime tools, including PHP 8.4 with IMAP and XSL. |
+| `pwsh` | PowerShell Core, available on Windows. |
 
-```yaml
-services:
-  ci-tools:
-    image: faulo/ci-tools:latest
-    volumes:
-      - steam:/root/Steam
+The Steam helper commands use [`slothsoft/unity`](https://packagist.org/packages/slothsoft/unity)
+through Composer. Run `steam-buildfile` without arguments, or
+`steam-login unexpected-argument`, to display their usage.
 
-volumes:
-  steam:
+## Quick start
+
+Generate a Steam app-build VDF on Linux, with your content in a local `depot`
+directory:
+
+```sh
+docker run --rm -v "$PWD:/workspace" faulo/ci-tools:latest steam-buildfile /workspace /workspace/logs 1000 2000=depot preview
 ```
 
-Windows:
+Upload a local build to itch.io on Linux:
 
-```yaml
-services:
-  ci-tools:
-    image: faulo/ci-tools:latest
-    volumes:
-      - steam:C:/steam
-
-volumes:
-  steam:
+```sh
+docker run --rm -e BUTLER_API_KEY -v "$PWD/build:/build:ro" faulo/ci-tools:latest butler push /build username/game:channel
 ```
 
-## Runtime credentials
+The image declares no entrypoint, so you can replace the complete command.
+The default command is `bash` on Linux and `cmd.exe` on Windows. Interactive
+containers and Jenkins Docker Pipeline keepers (`cat` or `cmd.exe`) are supported.
 
-Steam and mailbox credentials accept direct environment variables or
-conventional file-backed variants:
+Commands are on PATH and also work with `docker exec`:
 
-| Credential | Direct variables | File-backed variables |
+```sh
+docker run -dit --name ci-tools faulo/ci-tools:latest
+docker exec ci-tools steam-buildfile
+docker rm -f ci-tools
+```
+
+The explicit forms `ci-tools-launcher steam-buildfile [ARG...]` and
+`ci-tools-launcher steam-login [ARG...]` are also available. Shorthands use
+executable shell wrappers on Linux and ShimGen executables on Windows. The
+launcher preserves the working directory, argument boundaries, attached
+standard streams, and child exit status, and manages termination and deadlines.
+
+## Persistent Steam state
+
+Mount a named volume to retain SteamCMD downloads and authentication state:
+
+| Platform | Mount |
+| --- | --- |
+| Linux | `steam:/root/Steam` |
+| Windows | `steam:C:/steam` |
+
+For example, on Linux:
+
+```sh
+docker run --rm -v steam:/root/Steam faulo/ci-tools:latest steamcmd +quit
+```
+
+On Windows:
+
+```powershell
+docker run --rm -v steam:C:/steam faulo/ci-tools:latest steamcmd +quit
+```
+
+The Windows launcher bootstraps SteamCMD into the volume on first use.
+
+## Credentials and timeouts
+
+Steam login accepts environment variables or file-backed credentials:
+
+| Credential | Environment variables | File-backed variables |
 | --- | --- | --- |
 | Steam | `STEAM_CREDENTIALS_USR`, `STEAM_CREDENTIALS_PSW` | `STEAM_CREDENTIALS_USR_FILE`, `STEAM_CREDENTIALS_PSW_FILE` |
 | Mailbox | `EMAIL_CREDENTIALS_USR`, `EMAIL_CREDENTIALS_PSW` | `EMAIL_CREDENTIALS_USR_FILE`, `EMAIL_CREDENTIALS_PSW_FILE` |
 
-Each username/password pair may mix direct and file-backed inputs, but a direct
-variable and its `_FILE` form cannot both be set. Configured pairs must be
-complete. Missing, unreadable, and empty files fail before the child command
-starts. One trailing line ending is removed from a credential file; other
-whitespace is preserved. Resolved values are passed only to the child process.
+Each username/password pair may mix direct and file-backed inputs. A variable
+and its `_FILE` form cannot both be set, and configured pairs must be complete.
+Missing, unreadable, or empty credential files fail before the child command
+starts. One trailing line ending is removed; other whitespace is preserved.
+Resolved values are passed only to the child process.
 
-Example:
+With credentials already exported in your shell, sign in on Linux:
 
-```text
-docker run --rm \
-  -e STEAM_CREDENTIALS_USR \
-  -e STEAM_CREDENTIALS_PSW \
-  -e EMAIL_CREDENTIALS_USR \
-  -e EMAIL_CREDENTIALS_PSW \
-  -v steam:/root/Steam \
-  faulo/ci-tools:latest steam-login
+```sh
+docker run --rm -e STEAM_CREDENTIALS_USR -e STEAM_CREDENTIALS_PSW -e EMAIL_CREDENTIALS_USR -e EMAIL_CREDENTIALS_PSW -v steam:/root/Steam faulo/ci-tools:latest steam-login
 ```
 
-Generate a Steam app-build VDF:
+Set `CI_TOOLS_CALL_TIMEOUT` to limit each Steam helper call in seconds. Its
+default is `86400`; `0` disables the launcher deadline. A deadline returns exit
+code `124`, and an interrupted call returns `130`.
 
-```text
-docker run --rm faulo/ci-tools:latest \
-  steam-buildfile /workspace /workspace/logs 1000 2000=depot preview
+## Extending and building the image
+
+Both Dockerfiles use the repository root as their build context. Shared launcher
+sources live in `common/`; platform-specific packages and inputs live in
+`linux/` and `windows/`. A .NET SDK compiles the native launchers in a separate
+build stage.
+
+| Build argument | Default | Purpose |
+| --- | --- | --- |
+| `TOOL_TIMEOUT` | `14400` | Composer's child-process timeout in seconds. |
+| `NODE_VERSION` | `24` | Linux Node.js major release. |
+| `BASE_IMAGE` | `faulo/choco:windowsservercore-ltsc2019` | Windows runtime base with Chocolatey and `choco-install`. |
+
+The former `OS_BASE` and `CHOCOLATEY_VERSION` arguments are replaced by the shared
+Windows base selection. The rolling LTSC 2019 tag picks up shared-base updates
+while keeping the Windows release consistent.
+
+Build disposable images using explicit Docker contexts:
+
+```sh
+docker --context linux build -f linux/Dockerfile -t tmp/ci-tools:latest .
+docker --context windows build -f windows/Dockerfile -t tmp/ci-tools:latest .
 ```
 
-## Repository layout
+Windows nuspec dependencies install through the shared base's `choco-install`,
+which resolves dependencies and retries failed packages individually. Native
+installer problems should be reported to
+[`docker-choco`](https://github.com/Faulo/docker-choco/issues), with package
+versions, base digest, host Windows build, isolation mode, exact commands,
+sanitized logs, exit code or timeout, and a fresh-container reproduction.
+Installation failures must be resolved in the shared base before publishing;
+do not bypass package installers in downstream images. SteamCMD's bootstrap and
+the official PHP IMAP extension remain application-specific installation steps.
 
-- `common/CiTools/` contains the cross-platform native Composer launcher.
-- `common/CiTools.Tests/` contains daemon-free NUnit coverage.
-- `linux/` contains the Linux Dockerfile and `ci-tools.packages` manifest.
-- `windows/` contains the Windows Dockerfile, Chocolatey package metadata, PHP
-  extension configuration, and native SteamCMD bootstrap launcher.
-- `tests/` contains the cross-platform Pester image contract.
-
-Both Dockerfiles use the repository root as their build context.
-
-## Validation
+## Development checks
 
 Run unit tests with the .NET 9 SDK:
 
-```text
+```sh
 dotnet test common/CiTools.Tests/CiTools.Tests.csproj --configuration Release
 ```
 
-Build disposable candidates with explicit contexts:
+Run the complete image contract against a candidate:
 
-```text
-docker --context garl build --file linux/Dockerfile --tag tmp/ci-tools:latest .
-docker --context dende build --file windows/Dockerfile --tag tmp/ci-tools:latest .
+```powershell
+pwsh ./.jenkins/Invoke-IntegrationTests.ps1 -Namespace tmp -Context linux
+pwsh ./.jenkins/Invoke-IntegrationTests.ps1 -Namespace tmp -Context windows
 ```
 
-Run the complete image contract:
-
-```text
-pwsh ./.jenkins/Invoke-IntegrationTests.ps1 -Namespace tmp -Context garl
-pwsh ./.jenkins/Invoke-IntegrationTests.ps1 -Namespace tmp -Context dende
-```
+Steam login coverage requires the credentials listed above. GitHub Actions uses
+[`workflows-docker` v3](https://github.com/Faulo/workflows-docker) and `docker.json`
+for native builds and publication. Jenkins runs unit and image integration
+tests on both platforms. Image names resolve from the tracked `.env`.

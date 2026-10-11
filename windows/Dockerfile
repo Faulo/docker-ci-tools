@@ -1,4 +1,4 @@
-ARG OS_BASE=ltsc2019
+ARG BASE_IMAGE=faulo/choco:windowsservercore-ltsc2019
 FROM mcr.microsoft.com/dotnet/sdk:9.0-nanoserver-1809 AS build
 
 WORKDIR C:/solution
@@ -6,9 +6,10 @@ ENV NUGET_PACKAGES=C:/nuget/packages
 
 COPY . .
 
+# hadolint shell=powershell
 RUN dotnet publish --runtime win-x64
 
-FROM mcr.microsoft.com/windows/servercore:${OS_BASE}
+FROM ${BASE_IMAGE}
 
 SHELL ["C:/Windows/System32/WindowsPowerShell/v1.0/powershell", "-ExecutionPolicy", "Bypass", "-NonInteractive", "-NoProfile", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
@@ -17,29 +18,17 @@ WORKDIR C:/ci-tools
 ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV CI_TOOLS_CALL_TIMEOUT=86400
 
-ARG CHOCOLATEY_VERSION=1.4.0
-RUN $env:chocolateyVersion = $env:CHOCOLATEY_VERSION; \
-    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')); \
-    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) { throw 'Chocolatey installation failed' }
-
 # Runtime tools
 COPY windows/ci-tools.nuspec C:/ci-tools/ci-tools.nuspec
-RUN choco pack C:\ci-tools\ci-tools.nuspec; \
-    if ($LASTEXITCODE -ne 0) { throw 'Failed to pack ci-tools' }; \
-    $dependencyInstallSucceeded = $false; \
-    for ($attempt = 1; $attempt -le 5; $attempt++) { \
-        choco install ci-tools --no-progress --yes --ignore-checksums --execution-timeout=7200 --source 'C:\ci-tools;https://community.chocolatey.org/api/v2/'; \
-        if ($LASTEXITCODE -eq 0) { \
-            $dependencyInstallSucceeded = $true; \
-            break \
-        }; \
-        Write-Warning ('Chocolatey dependency installation attempt ' + $attempt + ' failed'); \
-        if ($attempt -lt 5) { Start-Sleep -Seconds (30 * $attempt) } \
-    }; \
-    if (-not $dependencyInstallSucceeded) { throw 'Failed to install ci-tools dependencies after 5 attempts' }; \
+# hadolint shell=powershell
+RUN choco-install C:/ci-tools/ci-tools.nuspec; \
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to install ci-tools dependencies' }; \
     $env:PATH = [Environment]::GetEnvironmentVariable('Path', 'Machine'); \
-    Remove-Item -Force C:\ci-tools\*.nuspec, C:\ci-tools\*.nupkg; \
-    butler --version; \
+    Remove-Item -LiteralPath C:/ci-tools/ci-tools.nuspec -Force
+
+# A fresh process sees installer changes to the machine PATH.
+# hadolint shell=powershell
+RUN butler --version; \
     if ($LASTEXITCODE -ne 0) { throw 'Butler smoke check failed' }; \
     node --version; \
     if ($LASTEXITCODE -ne 0) { throw 'Node.js smoke check failed' }; \
@@ -51,6 +40,7 @@ RUN choco pack C:\ci-tools\ci-tools.nuspec; \
     if ($LASTEXITCODE -ne 0) { throw 'PowerShell smoke check failed' }
 
 COPY windows/php-extensions.ini C:/tools/php84/ci-tools-extensions.ini
+# hadolint shell=powershell
 RUN $imapVersion = (Invoke-WebRequest -UseBasicParsing 'https://pecl.php.net/rest/r/imap/latest.txt').Content.Trim(); \
     $imapArchive = 'C:\php-imap.zip'; \
     $imapRoot = 'C:\php-imap'; \
@@ -65,15 +55,19 @@ RUN $imapVersion = (Invoke-WebRequest -UseBasicParsing 'https://pecl.php.net/res
     if ($modules -notcontains 'xsl') { throw 'PHP XSL extension is unavailable' }
 
 # Native launchers
-COPY --from=build C:/solution/common/CiTools/bin/Release/net9.0/win-x64/publish/ci-tools-launcher.exe C:/ci-tools/ci-tools-launcher.exe
-COPY --from=build C:/solution/windows/SteamCmd/bin/Release/net9.0/win-x64/publish/steamcmd.exe C:/ci-tools/steamcmd.exe
+COPY --from=build C:/solution/common/CiTools/bin/Release/net9.0/win-x64/publish/ci-tools-launcher.exe C:/ci-tools/bin/ci-tools-launcher.exe
+COPY --from=build C:/solution/windows/SteamCmd/bin/Release/net9.0/win-x64/publish/steamcmd.exe C:/steamcmd/steamcmd.exe
 
-RUN New-Item -ItemType Directory -Path C:\steamcmd | Out-Null; \
-    Move-Item -LiteralPath C:\ci-tools\steamcmd.exe -Destination C:\steamcmd\steamcmd.exe; \
-    New-Item -ItemType HardLink -Path C:\Windows\steam-buildfile.exe -Target C:\ci-tools\ci-tools-launcher.exe | Out-Null; \
-    New-Item -ItemType HardLink -Path C:\Windows\steam-login.exe -Target C:\ci-tools\ci-tools-launcher.exe | Out-Null
+# hadolint shell=powershell
+RUN foreach ($command in @('steam-buildfile', 'steam-login')) { \
+        & C:/ProgramData/chocolatey/tools/shimgen.exe -o ('C:/ci-tools/bin/' + $command + '.exe') -p C:/ci-tools/bin/ci-tools-launcher.exe -c $command; \
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath ('C:/ci-tools/bin/' + $command + '.exe'))) { throw ('Failed to create shim: ' + $command) } \
+    }; \
+    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine'); \
+    [Environment]::SetEnvironmentVariable('Path', ('C:\ci-tools\bin;' + $machinePath), 'Machine')
 
 # SteamCMD is installed into its persistent volume on first use.
+# hadolint shell=powershell
 RUN $archive = 'C:\steamcmd.zip'; \
     Invoke-WebRequest -Uri 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip' -OutFile $archive; \
     $extractRoot = 'C:\steamcmd-installer'; \
@@ -89,6 +83,7 @@ RUN $archive = 'C:\steamcmd.zip'; \
 
 # Composer-backed CI tools
 ARG TOOL_TIMEOUT=14400
+# hadolint shell=powershell
 RUN composer require ('slothsoft/unity') --no-interaction; \
     if ($LASTEXITCODE -ne 0) { throw 'Failed to require slothsoft/unity' }; \
     composer config process-timeout $env:TOOL_TIMEOUT; \

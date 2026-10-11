@@ -150,6 +150,53 @@ Describe "CI tools image contract [$Os, $Image]" {
 }
 
 Describe "Public command contract [$Os, $Image]" {
+    It 'runs installed tool payloads in fresh processes' {
+        foreach ($command in @('butler', 'node', 'php', 'composer')) {
+            $arguments = if ($Os -eq 'windows') {
+                @('cmd.exe', '/d', '/c', "$command --version")
+            } else {
+                @($command, '--version')
+            }
+            $result = Invoke-ImageCommand -Command $arguments
+            $result.ExitCode | Should -Be 0 -Because ($result.Output | Out-String)
+            ($result.Output | Out-String).Trim() | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    It 'provides the shared Chocolatey installer' -Skip:($Os -ne 'windows') {
+        $result = Invoke-ImageCommand -Command @('choco-install')
+        $result.ExitCode | Should -Be 2 -Because ($result.Output | Out-String)
+        $result = Invoke-ImageCommand -Command @('choco', '--version')
+        $result.ExitCode | Should -Be 0 -Because ($result.Output | Out-String)
+        ($result.Output | Out-String).Trim() | Should -Match '^1\.'
+    }
+
+    It 'supports explicit subcommands and shorthands through docker exec' {
+        $containerName = "ci-tools-exec-$([guid]::NewGuid().ToString('N'))"
+        $keeperCommand = if ($Os -eq 'windows') { 'cmd.exe' } else { 'cat' }
+        try {
+            Invoke-Docker -Context $Context -RunArguments $DockerRunArguments -Arguments @(
+                'run', '--detach', '--tty', '--name', $containerName, $Image, $keeperCommand
+            )
+            foreach ($command in @(
+                @{ Arguments = @('steam-buildfile'); Help = '^Create a steam build file\.' },
+                @{ Arguments = @('ci-tools-launcher', 'steam-buildfile'); Help = '^Create a steam build file\.' },
+                @{ Arguments = @('steam-login', 'unexpected-argument'); Help = '^Sign in to Steam via steamcmd\.' },
+                @{ Arguments = @('ci-tools-launcher', 'steam-login', 'unexpected-argument'); Help = '^Sign in to Steam via steamcmd\.' }
+            )) {
+                $result = Get-DockerCommandResult -Context $Context -Arguments (
+                    @('exec', $containerName) + $command.Arguments
+                )
+                $result.ExitCode | Should -Be 0 -Because ($result.Output | Out-String)
+                ($result.Output | Out-String) | Should -Match ('(?m)' + $command.Help)
+            }
+        } finally {
+            Get-DockerCommandResult -Context $Context -Arguments @(
+                'container', 'rm', '--force', $containerName
+            ) | Out-Null
+        }
+    }
+
     It 'provides PHP 8.4' {
         $result = Invoke-ImageCommand -Command @(
             'php', '-r', 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;'

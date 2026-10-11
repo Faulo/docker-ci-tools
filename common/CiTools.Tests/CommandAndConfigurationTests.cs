@@ -26,6 +26,19 @@ public sealed class CommandAndConfigurationTests {
         Assert.That(exception!.Message, Does.Contain("ci-tools-launcher"));
     }
 
+    [TestCase("steam-buildfile")]
+    [TestCase("steam-login")]
+    public void RoutesExplicitSubcommandsWithoutChangingArguments(string command) {
+        string[] arguments = [command, "argument with spaces", "", "quoted\"value", "--option=value"];
+
+        Assert.That(CommandRouter.Route("ci-tools-launcher", arguments),
+            Is.EqualTo(new[] { "exec", command, "--" }.Concat(arguments.Skip(1))));
+    }
+
+    [Test]
+    public void RejectsUnknownExplicitSubcommands() =>
+        Assert.Throws<ArgumentException>(() => CommandRouter.Route("ci-tools-launcher", ["unknown"]));
+
     [Test]
     public void UsesInvokedAliasInsteadOfResolvedProcessPath() {
         string executable = Program.ResolveExecutable(

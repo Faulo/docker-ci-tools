@@ -41,6 +41,7 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV CI_TOOLS_CALL_TIMEOUT=86400
+ENV PATH="/ci-tools/bin:${PATH}"
 
 # Package sources
 RUN apt-get update && \
@@ -80,15 +81,14 @@ RUN ln -s /opt/steamcmd/linux64/steamcmd /usr/local/bin/steamcmd && \
 
 # Composer-backed CI tools
 COPY --chmod=755 --from=composer:2 /usr/bin/composer /usr/local/bin/composer
-COPY --chmod=755 --from=build /solution/common/CiTools/bin/Release/net9.0/linux-x64/publish/ci-tools-launcher /ci-tools/ci-tools-launcher
+COPY --chmod=755 --from=build /solution/common/CiTools/bin/Release/net9.0/linux-x64/publish/ci-tools-launcher /ci-tools/bin/ci-tools-launcher
+COPY --chmod=755 linux/bin/ /ci-tools/bin/
 
 RUN cd /ci-tools && \
     composer require "slothsoft/unity" --no-interaction && \
     composer config process-timeout "${TOOL_TIMEOUT}" && \
     composer update --no-interaction --no-dev --optimize-autoloader --classmap-authoritative && \
     composer check-platform-reqs --no-dev && \
-    ln -s /ci-tools/ci-tools-launcher /usr/local/bin/steam-buildfile && \
-    ln -s /ci-tools/ci-tools-launcher /usr/local/bin/steam-login && \
     steam-buildfile | grep -q '^Create a steam build file\.' && \
     steam-login unexpected-argument | grep -q '^Sign in to Steam via steamcmd\.'
 

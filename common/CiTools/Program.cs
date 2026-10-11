@@ -165,6 +165,10 @@ static class CommandRouter {
     static readonly string[] commands = ["steam-buildfile", "steam-login"];
 
     internal static string[] Route(string executable, string[] arguments) {
+        if (executable.Equals("ci-tools-launcher", StringComparison.OrdinalIgnoreCase) && arguments.Length > 0) {
+            executable = arguments[0];
+            arguments = arguments[1..];
+        }
         string? command = commands.SingleOrDefault(candidate => candidate.Equals(executable, StringComparison.OrdinalIgnoreCase));
         return command is null
             ? throw new ArgumentException($"Unsupported CI tool launcher name: {Program.SanitizeText(executable, 80)}")
