@@ -7,9 +7,6 @@ $RECYCLE.BIN/
 # == .NET ==
 **/bin/
 **/obj/
-**/TestResults/
-!linux/bin/
-!linux/bin/**
 
 # == DevOps ==
 .git/

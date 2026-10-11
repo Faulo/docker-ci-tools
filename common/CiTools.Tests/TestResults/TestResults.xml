@@ -1,0 +1,38 @@
+<testsuites>
+  <testsuite name="CiTools.Tests.dll" tests="27" skipped="0" failures="0" errors="0" time="0.050536" timestamp="2026-10-11T11:38:10" hostname="ESTELLE" id="0" package="CiTools.Tests.dll">
+    <properties />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="ParsesCallTimeout(null,86400)" time="0.0053510" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="ParsesCallTimeout(&quot;&quot;,86400)" time="0.0003160" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="ParsesCallTimeout(&quot;0&quot;,0)" time="0.0000320" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="ParsesCallTimeout(&quot;42&quot;,42)" time="0.0000280" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="RejectsInvalidCallTimeout(&quot;-1&quot;)" time="0.0052610" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="RejectsInvalidCallTimeout(&quot;one&quot;)" time="0.0002750" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="RejectsInvalidCallTimeout(&quot; 1&quot;)" time="0.0000690" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="RejectsUnknownExplicitSubcommands" time="0.0010320" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="RejectsUnknownLauncherNames" time="0.0145900" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="RoutesExplicitSubcommandsWithoutChangingArguments(&quot;steam-buildfile&quot;)" time="0.0072450" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="RoutesExplicitSubcommandsWithoutChangingArguments(&quot;steam-login&quot;)" time="0.0002880" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="RoutesPublicCommandsThroughComposer(&quot;steam-buildfile&quot;)" time="0.0003280" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="RoutesPublicCommandsThroughComposer(&quot;steam-login&quot;)" time="0.0001550" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="SelectsInstalledComposerProjectWithoutChangingWorkingDirectory" time="0.0037720" />
+    <testcase classname="CiTools.Tests.CommandAndConfigurationTests" name="UsesInvokedAliasInsteadOfResolvedProcessPath" time="0.0004220" />
+    <testcase classname="CiTools.Tests.RuntimeCredentialsTests" name="RejectsDirectAndFileBackedFormsTogether(&quot;EMAIL_CREDENTIALS_USR&quot;)" time="0.0035480" />
+    <testcase classname="CiTools.Tests.RuntimeCredentialsTests" name="RejectsDirectAndFileBackedFormsTogether(&quot;EMAIL_CREDENTIALS_PSW&quot;)" time="0.0002970" />
+    <testcase classname="CiTools.Tests.RuntimeCredentialsTests" name="RejectsDirectAndFileBackedFormsTogether(&quot;STEAM_CREDENTIALS_USR&quot;)" time="0.0000860" />
+    <testcase classname="CiTools.Tests.RuntimeCredentialsTests" name="RejectsDirectAndFileBackedFormsTogether(&quot;STEAM_CREDENTIALS_PSW&quot;)" time="0.0000630" />
+    <testcase classname="CiTools.Tests.RuntimeCredentialsTests" name="RejectsEmptyCredentialFile(&quot;&quot;)" time="0.0010860" />
+    <testcase classname="CiTools.Tests.RuntimeCredentialsTests" name="RejectsEmptyCredentialFile(&quot;\n&quot;)" time="0.0002830" />
+    <testcase classname="CiTools.Tests.RuntimeCredentialsTests" name="RejectsEmptyCredentialFile(&quot;\r\n&quot;)" time="0.0000610" />
+    <testcase classname="CiTools.Tests.RuntimeCredentialsTests" name="RejectsIncompleteCredentialPair(&quot;EMAIL_CREDENTIALS_USR&quot;,&quot;EMAIL_CREDENTIALS_PSW&quot;)" time="0.0004740" />
+    <testcase classname="CiTools.Tests.RuntimeCredentialsTests" name="RejectsIncompleteCredentialPair(&quot;STEAM_CREDENTIALS_USR&quot;,&quot;STEAM_CREDENTIALS_PSW&quot;)" time="0.0002220" />
+    <testcase classname="CiTools.Tests.RuntimeCredentialsTests" name="RejectsMissingCredentialFileWithoutLeakingPairedValue" time="0.0008160" />
+    <testcase classname="CiTools.Tests.RuntimeCredentialsTests" name="ResolvesDirectFileBackedAndMixedPairs" time="0.0039020" />
+    <testcase classname="CiTools.Tests.RuntimeCredentialsTests" name="TreatsCompleteEmptyDirectPairAsUnconfigured" time="0.0005340" />
+    <system-out>
+Test Framework Informational Messages:
+NUnit Adapter 1.0.0.0: Test execution started
+Running all tests in C:\Users\Daniel.KDG\Desktop\Eclipse\docker-ci-tools\common\CiTools.Tests\bin\Debug\net9.0\CiTools.Tests.dll
+   NUnit3TestExecutor discovered 27 of 27 NUnit test cases using Current Discovery mode, Non-Explicit run
+</system-out>
+  </testsuite>
+</testsuites>
