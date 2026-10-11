@@ -8,6 +8,18 @@ pipeline {
     }
 
     stages {
+        stage('Unit Tests') {
+            agent {
+                docker {
+                    image 'mcr.microsoft.com/dotnet/sdk:9.0'
+                    label 'docker && linux'
+                }
+            }
+            steps {
+                exec 'dotnet test --logger junit'
+                junit(testResults: '**/TestResults.xml', allowEmptyResults: true)
+            }
+        }
         stage('Integration Tests') {
             steps {
                 script {
@@ -93,30 +105,6 @@ def pesterProject(config) {
 
                 dir('.reports') {
                     deleteDir()
-                }
-
-                stage("Unit Tests: ${target}") {
-                    timeout(time: timeoutMinutes, unit: 'MINUTES') {
-                        def sdkImage = os == 'windows'
-                            ? 'mcr.microsoft.com/dotnet/sdk:9.0-nanoserver-1809'
-                            : 'mcr.microsoft.com/dotnet/sdk:9.0-bookworm-slim'
-                        // Nano Server needs an absolute NuGet cache; the SDK user must write the agent checkout.
-                        def sdkArguments = os == 'windows'
-                            ? '--user ContainerAdministrator --env NUGET_PACKAGES=C:/nuget/packages'
-                            : ''
-                        docker.image(sdkImage).inside(sdkArguments) {
-                            def command = 'dotnet test common/CiTools.Tests/CiTools.Tests.csproj --nologo --configuration Release --blame-hang-timeout 2m --logger "trx;LogFileName=unit-tests.trx" --results-directory .reports/unit-tests'
-                            try {
-                                if (os == 'windows') {
-                                    bat command
-                                } else {
-                                    sh command
-                                }
-                            } finally {
-                                archiveArtifacts artifacts: '.reports/unit-tests/**', allowEmptyArchive: false
-                            }
-                        }
-                    }
                 }
 
                 withEnvFile {

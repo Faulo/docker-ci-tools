@@ -155,7 +155,7 @@ the official PHP IMAP extension remain application-specific installation steps.
 Run unit tests with the .NET 9 SDK:
 
 ```sh
-dotnet test common/CiTools.Tests/CiTools.Tests.csproj --configuration Release
+dotnet test common/CiTools.Tests/CiTools.Tests.csproj --configuration Release --logger junit
 ```
 
 Run the complete image contract against a candidate:
@@ -169,3 +169,9 @@ Steam login coverage requires the credentials listed above. GitHub Actions uses
 [`workflows-docker` v3](https://github.com/Faulo/workflows-docker) and `docker.json`
 for native builds and publication. Jenkins runs unit and image integration
 tests on both platforms. Image names resolve from the tracked `.env`.
+
+Jenkins runs `dotnet test --logger junit` in the .NET 9 SDK container on a
+Linux agent and publishes `**/TestResults.xml` with its native `junit` step.
+Each test project writes its report to `TestResults/TestResults.xml`.
+Image integration tests continue to use the targets and variants configured
+in `.jenkins/pesterProject.properties`.
