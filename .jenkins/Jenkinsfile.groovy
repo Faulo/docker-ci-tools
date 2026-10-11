@@ -100,7 +100,11 @@ def pesterProject(config) {
                         def sdkImage = os == 'windows'
                             ? 'mcr.microsoft.com/dotnet/sdk:9.0-nanoserver-1809'
                             : 'mcr.microsoft.com/dotnet/sdk:9.0-bookworm-slim'
-                        docker.image(sdkImage).inside {
+                        // Nano Server needs an absolute NuGet cache; the SDK user must write the agent checkout.
+                        def sdkArguments = os == 'windows'
+                            ? '--user ContainerAdministrator --env NUGET_PACKAGES=C:/nuget/packages'
+                            : ''
+                        docker.image(sdkImage).inside(sdkArguments) {
                             def command = 'dotnet test common/CiTools.Tests/CiTools.Tests.csproj --nologo --configuration Release --blame-hang-timeout 2m --logger "trx;LogFileName=unit-tests.trx" --results-directory .reports/unit-tests'
                             try {
                                 if (os == 'windows') {
