@@ -82,7 +82,7 @@ RUN ln -s /opt/steamcmd/linux64/steamcmd /usr/local/bin/steamcmd && \
 # Composer-backed CI tools
 COPY --chmod=755 --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 COPY --chmod=755 --from=build /solution/common/CiTools/bin/Release/net9.0/linux-x64/publish/ci-tools-launcher /ci-tools/bin/ci-tools-launcher
-COPY --chmod=755 linux/bin/ /ci-tools/bin/
+COPY --chmod=755 linux/commands/ /ci-tools/bin/
 
 RUN cd /ci-tools && \
     composer require "slothsoft/unity" --no-interaction && \
