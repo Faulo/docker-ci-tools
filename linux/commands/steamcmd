@@ -1,0 +1,4 @@
+#!/bin/sh
+# Valve's launcher handles client restart requests after self-updates.
+export STEAM_PLATFORM=linux64
+exec /opt/steamcmd/steamcmd.sh "$@"

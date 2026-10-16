@@ -288,6 +288,31 @@ Describe "Public command contract [$Os, $Image]" {
         $output | Should -Match '"SetLive"\s+"preview branch"'
     }
 
+    It 'handles Linux SteamCMD restart requests while preserving arguments and exit status' -Skip:($Os -ne 'linux') {
+        $probe = @'
+set -eu
+cat > /opt/steamcmd/linux64/steamcmd <<'CLIENT'
+#!/bin/sh
+if [ ! -f /tmp/steamcmd-restarted ]; then
+    touch /tmp/steamcmd-restarted
+    exit 42
+fi
+printf 'cwd=<%s>\n' "$PWD"
+printf 'arg=<%s>\n' "$@"
+exit 17
+CLIENT
+chmod +x /opt/steamcmd/linux64/steamcmd
+mkdir -p '/tmp/steam working directory'
+cd '/tmp/steam working directory'
+exec steamcmd '+login' 'user with spaces' '' '+quit'
+'@
+        $result = Invoke-ImageCommand -Command @('/bin/sh', '-c', ($probe -replace "`r`n", "`n"))
+        $result.ExitCode | Should -Be 17 -Because ($result.Output | Out-String)
+        $output = $result.Output | Out-String
+        $output | Should -Match 'cwd=</tmp/steam working directory>'
+        $output | Should -Match 'arg=<\+login>\s+arg=<user with spaces>\s+arg=<>\s+arg=<\+quit>'
+    }
+
     It 'logs in to Steam with the configured runtime credentials' {
         $result = Invoke-ImageCommand -Command @('steam-login')
         $result.ExitCode | Should -Be 0 -Because ($result.Output | Out-String)

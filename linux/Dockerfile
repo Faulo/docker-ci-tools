@@ -27,7 +27,7 @@ RUN set -eux; \
     ./steamcmd.sh +quit || status=$?; \
     test "$status" -eq 0 -o "$status" -eq 139; \
     test -x /opt/steamcmd/linux64/steamcmd; \
-    /opt/steamcmd/linux64/steamcmd +quit
+    STEAM_PLATFORM=linux64 ./steamcmd.sh +quit
 
 FROM debian:trixie-slim
 
@@ -76,8 +76,8 @@ RUN curl -fsSL "https://broth.itch.zone/butler/linux-amd64/LATEST/archive/defaul
 
 # SteamCMD
 COPY --from=steamcmd-installer /opt/steamcmd /opt/steamcmd
-RUN ln -s /opt/steamcmd/linux64/steamcmd /usr/local/bin/steamcmd && \
-    steamcmd +quit
+COPY --chmod=755 linux/commands/steamcmd /ci-tools/bin/steamcmd
+RUN steamcmd +quit
 
 # Composer-backed CI tools
 COPY --chmod=755 --from=composer:2 /usr/bin/composer /usr/local/bin/composer
