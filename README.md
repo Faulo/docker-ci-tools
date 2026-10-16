@@ -17,8 +17,10 @@ compatible Windows host. Pin an individual image digest when you need an exact
 image. Images are rebuilt monthly to pick up dependency updates.
 
 Use `latest` for automatic platform selection, or a target-specific tag to
-select Linux amd64 or Windows LTSC 2019 explicitly. Other historical platform
-and LTSC suffix tags are no longer updated.
+select Linux amd64 or Windows LTSC 2019 explicitly. Schema version `3` in
+`docker.json` uses recursive product, OS, and architecture or release axes. Intermediate `latest-linux` and `latest-windows` tags select
+their OS subset; the existing exact tags remain available. Unconfigured historical
+tags are retained without updates.
 
 ## Included tools
 
