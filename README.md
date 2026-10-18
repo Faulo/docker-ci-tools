@@ -1,9 +1,6 @@
 # CI tools for Linux and Windows containers
 
-[![Docker](https://github.com/Faulo/docker-ci-tools/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/Faulo/docker-ci-tools/actions/workflows/docker.yml)
-[![Docker image updated](https://img.shields.io/docker/last-updated/faulo/ci-tools/latest)](https://hub.docker.com/r/faulo/ci-tools/tags?name=latest)
-[![License: MIT](https://img.shields.io/github/license/Faulo/docker-ci-tools)](LICENSE)
-[![Platforms: Linux and Windows amd64](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20amd64-0078D4)](#available-images)
+[![Docker](https://github.com/Faulo/docker-ci-tools/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/Faulo/docker-ci-tools/actions/workflows/docker.yml) [![Docker image updated](https://img.shields.io/docker/last-updated/faulo/ci-tools/latest)](https://hub.docker.com/r/faulo/ci-tools/tags?name=latest) [![License: MIT](https://img.shields.io/github/license/Faulo/docker-ci-tools)](LICENSE) [![Platforms: Linux and Windows amd64](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20amd64-0078D4)](#available-images)
 
 [`faulo/ci-tools`](https://hub.docker.com/r/faulo/ci-tools) provides command-line
 tools for uploading builds to Steam and itch.io. Run individual commands with
