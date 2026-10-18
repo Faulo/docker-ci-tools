@@ -1,5 +1,10 @@
 # CI tools for Linux and Windows containers
 
+[![Docker](https://github.com/Faulo/docker-ci-tools/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/Faulo/docker-ci-tools/actions/workflows/docker.yml)
+[![Docker image updated](https://img.shields.io/docker/last-updated/faulo/ci-tools/latest)](https://hub.docker.com/r/faulo/ci-tools/tags?name=latest)
+[![License: MIT](https://img.shields.io/github/license/Faulo/docker-ci-tools)](LICENSE)
+[![Platforms: Linux and Windows amd64](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20amd64-0078D4)](#available-images)
+
 [`faulo/ci-tools`](https://hub.docker.com/r/faulo/ci-tools) provides command-line
 tools for uploading builds to Steam and itch.io. Run individual commands with
 Docker, use the image in a CI pipeline, or extend it with your own build tools.
@@ -17,10 +22,9 @@ compatible Windows host. Pin an individual image digest when you need an exact
 image. Images are rebuilt monthly to pick up dependency updates.
 
 Use `latest` for automatic platform selection, or a target-specific tag to
-select Linux amd64 or Windows LTSC 2019 explicitly. Schema version `3` in
-`docker.json` uses recursive product, OS, and architecture or release axes. Intermediate `latest-linux` and `latest-windows` tags select
-their OS subset; the existing exact tags remain available. Unconfigured historical
-tags are retained without updates.
+select Linux amd64 or Windows LTSC 2019 explicitly. The intermediate
+`latest-linux` and `latest-windows` tags select an operating system.
+Tags receive updates in place; pin an image digest for a reproducible base.
 
 ## Included tools
 
@@ -54,7 +58,7 @@ docker run --rm -e BUTLER_API_KEY -v "$PWD/build:/build:ro" faulo/ci-tools:lates
 
 The image declares no entrypoint, so you can replace the complete command.
 The default command is `bash` on Linux and `cmd.exe` on Windows. Interactive
-containers and Jenkins Docker Pipeline keepers (`cat` or `cmd.exe`) are supported.
+containers and overridden commands such as `cat` or `cmd.exe` are supported.
 
 Commands are on PATH and also work with `docker exec`:
 
@@ -133,49 +137,44 @@ build stage.
 | `NODE_VERSION` | `24` | Linux Node.js major release. |
 | `BASE_IMAGE` | `faulo/choco:windowsservercore-ltsc2019` | Windows runtime base with Chocolatey and `choco-install`. |
 
-The former `OS_BASE` and `CHOCOLATEY_VERSION` arguments are replaced by the shared
-Windows base selection. The rolling LTSC 2019 tag picks up shared-base updates
-while keeping the Windows release consistent.
-
-Build disposable images using explicit Docker contexts:
+Build from the repository root using a Docker engine configured for the chosen
+container OS. Run the appropriate command for that engine:
 
 ```sh
-docker --context linux build -f linux/Dockerfile -t tmp/ci-tools:latest .
-docker --context windows build -f windows/Dockerfile -t tmp/ci-tools:latest .
+docker build -f linux/Dockerfile -t tmp/ci-tools:latest .
+docker build -f windows/Dockerfile -t tmp/ci-tools:latest .
 ```
-
-Windows nuspec dependencies install through the shared base's `choco-install`,
-which resolves dependencies and retries failed packages individually. Native
-installer problems should be reported to
-[`docker-choco`](https://github.com/Faulo/docker-choco/issues), with package
-versions, base digest, host Windows build, isolation mode, exact commands,
-sanitized logs, exit code or timeout, and a fresh-container reproduction.
-Installation failures must be resolved in the shared base before publishing;
-do not bypass package installers in downstream images. SteamCMD's bootstrap and
-the official PHP IMAP extension remain application-specific installation steps.
 
 ## Development checks
 
-Run unit tests with the .NET 9 SDK:
+Run the launcher unit tests from the repository root with the .NET 9 SDK:
 
 ```sh
-dotnet test common/CiTools.Tests/CiTools.Tests.csproj --configuration Release --logger junit
+dotnet test common/CiTools.Tests/CiTools.Tests.csproj --configuration Release
 ```
 
-Run the complete image contract against a candidate:
+The repository also includes image integration tests for the installed tools,
+launcher behavior, SteamCMD state, and authenticated Steam login on Linux and
+Windows. Steam login coverage requires the credentials listed above.
 
-```powershell
-pwsh ./.jenkins/Invoke-IntegrationTests.ps1 -Namespace tmp -Context linux
-pwsh ./.jenkins/Invoke-IntegrationTests.ps1 -Namespace tmp -Context windows
-```
+## Maintenance and updates
 
-Steam login coverage requires the credentials listed above. GitHub Actions uses
-[`workflows-docker` v3](https://github.com/Faulo/workflows-docker) and `docker.json`
-for native builds and publication. Jenkins runs unit and image integration
-tests on both platforms. Image names resolve from the tracked `.env`.
+Linux amd64 and Windows Server Core LTSC 2019 images are rebuilt monthly.
+Recreate containers or rebuild downstream images with `docker build --pull`
+to adopt updates. Persist Steam state separately from the container layer.
 
-Jenkins runs `dotnet test --logger junit` in the .NET 9 SDK container on a
-Linux agent and publishes `**/TestResults.xml` with its native `junit` step.
-Each test project writes its report to `TestResults/TestResults.xml`.
-Image integration tests continue to use the targets and variants configured
-in `.jenkins/pesterProject.properties`.
+## Support and contributions
+
+[Open an issue](https://github.com/Faulo/docker-ci-tools/issues) with the image
+tag or digest, container OS, command, and a minimal reproduction. For installer
+failures, include the package version and Windows host version and isolation
+mode. Remove credentials from logs before sharing them.
+
+Pull requests are welcome. Include tests for changes to launcher behavior and
+update the documentation when public commands or image contents change.
+
+## License
+
+The original code, Dockerfiles, scripts, and documentation are licensed under
+the [MIT License](LICENSE). Bundled tools and base images retain their respective
+licenses; Steam and itch.io services remain subject to their own terms.

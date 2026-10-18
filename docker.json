@@ -2,6 +2,8 @@
     "schemaVersion": 3,
     "namespace": "$DOCKER_NAMESPACE",
     "image": "$DOCKER_IMAGE",
+    "description": "Command-line tools for Steam and itch.io publishing in Linux and Windows containers",
+    "overviewFile": "README.md",
     "context": ".",
     "matrix": {
         "product": {
