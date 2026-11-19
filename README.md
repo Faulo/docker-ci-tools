@@ -34,6 +34,8 @@ Tags receive updates in place; pin an image digest for a reproducible base.
 | `php`, `composer`, `node` | Runtime tools, including PHP 8.4 with IMAP and XSL. |
 | `pwsh` | PowerShell Core, available on Windows. |
 
+The Windows image also inherits Git and Git LFS from its Chocolatey base.
+
 The Steam helper commands use [`slothsoft/unity`](https://packagist.org/packages/slothsoft/unity)
 through Composer. Run `steam-buildfile` without arguments, or
 `steam-login unexpected-argument`, to display their usage.
@@ -153,6 +155,8 @@ dotnet test common/CiTools.Tests/CiTools.Tests.csproj --configuration Release
 The repository also includes image integration tests for the installed tools,
 launcher behavior, SteamCMD state, and authenticated Steam login on Linux and
 Windows. Steam login coverage requires the credentials listed above.
+The Windows Code Integrity tests measure the Docker host's kernel pool. Run
+them without concurrent builds or container starts on that host.
 
 ## Maintenance and updates
 

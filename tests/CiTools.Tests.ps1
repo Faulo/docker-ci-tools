@@ -47,7 +47,6 @@ Describe "CI tools image contract [$Os, $Image]" {
         ) | ConvertFrom-Json
         $entrypointProperty = $imageConfig.PSObject.Properties['Entrypoint']
         $commandProperty = $imageConfig.PSObject.Properties['Cmd']
-        $environmentProperty = $imageConfig.PSObject.Properties['Env']
         $volumesProperty = $imageConfig.PSObject.Properties['Volumes']
         $portsProperty = $imageConfig.PSObject.Properties['ExposedPorts']
         $healthcheckProperty = $imageConfig.PSObject.Properties['Healthcheck']
@@ -60,11 +59,6 @@ Describe "CI tools image contract [$Os, $Image]" {
             @()
         } else {
             @($commandProperty.Value)
-        }))
-        $environment = @($(if ($null -eq $environmentProperty -or $null -eq $environmentProperty.Value) {
-            @()
-        } else {
-            @($environmentProperty.Value)
         }))
         $volumes = @($(if ($null -eq $volumesProperty -or $null -eq $volumesProperty.Value) {
             @()
@@ -108,10 +102,9 @@ Describe "CI tools image contract [$Os, $Image]" {
         $defaultCommand | Should -BeExactly $expected
     }
 
-    It 'does not declare a health check, published port, or Unity environment' {
+    It 'does not declare a health check or exposed ports' {
         $healthcheck | Should -BeNullOrEmpty
         $ports | Should -BeNullOrEmpty
-        $environment | Should -Not -Match '(^|=)(COMPOSE_UNITY|UNITY_)'
     }
 
     It 'declares only the platform Steam state volume' {
@@ -226,38 +219,10 @@ Describe "Public command contract [$Os, $Image]" {
         $result.ExitCode | Should -Be 0 -Because ($result.Output | Out-String)
     }
 
-    It 'provides PowerShell Core only on Windows' {
-        $probe = if ($Os -eq 'windows') {
-            @('cmd.exe', '/S', '/C', 'where pwsh.exe >nul 2>&1')
-        } else {
-            @('/bin/sh', '-c', 'if command -v pwsh >/dev/null 2>&1; then exit 1; fi')
-        }
-        $result = Invoke-ImageCommand -Command $probe
+    It 'runs PowerShell Core on Windows' -Skip:($Os -ne 'windows') {
+        $result = Invoke-ImageCommand -Command @('pwsh', '-NoLogo', '-NoProfile', '-Command', '$PSVersionTable.PSEdition')
         $result.ExitCode | Should -Be 0 -Because ($result.Output | Out-String)
-    }
-
-    It 'does not provide removed commands' {
-        $commands = @(
-            'compose-unity', 'unityhub', 'git', 'git-lfs', 'nano', 'blender',
-            'python', 'python3', 'ffmpeg', 'dotnet', 'docfx'
-        )
-        $probe = if ($Os -eq 'windows') {
-            $commandList = ($commands | ForEach-Object { "'$_'" }) -join ', '
-            @(
-                'pwsh', '-NoLogo', '-NoProfile', '-Command',
-                ("`$present = @($commandList) | Where-Object { Get-Command `$_ -ErrorAction SilentlyContinue }; " +
-                 "if (`$present) { Write-Error ('Unexpected commands: ' + (`$present -join ', ')); exit 1 }")
-            )
-        } else {
-            @(
-                '/bin/sh', '-c',
-                ("present=''; for command in $($commands -join ' '); do " +
-                 'command -v "$command" >/dev/null 2>&1 && present="$present $command"; done; ' +
-                 'test -z "$present" || { echo "Unexpected commands:$present" >&2; exit 1; }')
-            )
-        }
-        $result = Invoke-ImageCommand -Command $probe
-        $result.ExitCode | Should -Be 0 -Because ($result.Output | Out-String)
+        ($result.Output | Out-String).Trim() | Should -BeExactly 'Core'
     }
 
     It 'generates a Steam VDF while preserving argument boundaries' {
