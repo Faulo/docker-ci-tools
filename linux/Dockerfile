@@ -14,6 +14,9 @@ FROM debian:trixie-slim AS steamcmd-installer
 
 ARG DEBIAN_FRONTEND=noninteractive
 
+# Refresh the cached installation when Valve publishes a new 64-bit client.
+ADD https://client-update.steamstatic.com/steam_cmd_steamrt64 /tmp/steamcmd-manifest
+
 # Valve distributes the x64 client through a 32-bit self-updating bootstrapper.
 RUN set -eux; \
     apt-get update; \
@@ -21,7 +24,7 @@ RUN set -eux; \
     install -m 0755 -d /opt/steamcmd; \
     curl -fsSL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" -o /tmp/steamcmd.tar.gz; \
     tar -xzf /tmp/steamcmd.tar.gz -C /opt/steamcmd; \
-    rm -f /tmp/steamcmd.tar.gz; \
+    rm -f /tmp/steamcmd.tar.gz /tmp/steamcmd-manifest; \
     cd /opt/steamcmd; \
     status=0; \
     ./steamcmd.sh +quit || status=$?; \

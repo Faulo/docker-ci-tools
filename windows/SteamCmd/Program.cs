@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 
 namespace CiTools.SteamCmd;
 
 static class Program {
     const string STEAM_DIRECTORY = @"C:\steam";
+    const string SEED_DIRECTORY = @"C:\steamcmd\seed";
     const string INSTALLER_PATH = @"C:\steamcmd\steamcmd-installer.exe";
     static readonly string steamCmdPath = Path.Combine(STEAM_DIRECTORY, "steamcmd.exe");
     static readonly string lockPath = Path.Combine(STEAM_DIRECTORY, ".steamcmd.lock");
@@ -17,12 +19,12 @@ static class Program {
         try {
             Directory.CreateDirectory(STEAM_DIRECTORY);
             using var invocationLock = AcquireInvocationLock();
-            bool installed = EnsureSteamCmdInstalled();
+            bool needsBootstrap = PrepareSteamCmd();
 
             ConsoleCancelEventHandler keepWrapperAlive = (_, eventArgs) => eventArgs.Cancel = true;
             Console.CancelKeyPress += keepWrapperAlive;
             try {
-                if (installed) {
+                if (needsBootstrap) {
                     RunSteamCmd(["+quit"]);
                 }
 
@@ -83,12 +85,16 @@ static class Program {
         }
     }
 
-    static bool EnsureSteamCmdInstalled() {
+    static bool PrepareSteamCmd() {
         if (IsExecutable(steamCmdPath)) {
             return false;
         }
 
-        if (!IsExecutable(INSTALLER_PATH)) {
+        string seedExecutable = Path.Combine(SEED_DIRECTORY, "steamcmd.exe");
+        bool useSeed = IsExecutable(seedExecutable)
+            && Directory.EnumerateFileSystemEntries(STEAM_DIRECTORY)
+                .All(path => string.Equals(path, lockPath, StringComparison.OrdinalIgnoreCase));
+        if (!useSeed && !IsExecutable(INSTALLER_PATH)) {
             throw new InvalidDataException($"SteamCMD installer is missing or invalid: {INSTALLER_PATH}");
         }
 
@@ -98,11 +104,27 @@ static class Program {
 
         string temporaryPath = Path.Combine(STEAM_DIRECTORY, $".steamcmd-{Guid.NewGuid():N}.tmp");
         try {
-            File.Copy(INSTALLER_PATH, temporaryPath);
+            if (useSeed) {
+                CopySeedFiles(seedExecutable);
+            }
+            File.Copy(useSeed ? seedExecutable : INSTALLER_PATH, temporaryPath);
             File.Move(temporaryPath, steamCmdPath);
-            return true;
+            return !useSeed;
         } finally {
             File.Delete(temporaryPath);
+        }
+    }
+
+    static void CopySeedFiles(string seedExecutable) {
+        foreach (string sourcePath in Directory.EnumerateFiles(SEED_DIRECTORY, "*", SearchOption.AllDirectories)) {
+            if (string.Equals(sourcePath, seedExecutable, StringComparison.OrdinalIgnoreCase)) {
+                continue;
+            }
+
+            string relativePath = Path.GetRelativePath(SEED_DIRECTORY, sourcePath);
+            string destinationPath = Path.Combine(STEAM_DIRECTORY, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+            File.Copy(sourcePath, destinationPath);
         }
     }
 

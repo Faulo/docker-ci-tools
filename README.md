@@ -94,9 +94,11 @@ On Windows:
 docker run --rm -v steam:C:/steam faulo/ci-tools:latest steamcmd +quit
 ```
 
-The Windows launcher bootstraps SteamCMD into the volume on first use.
+The Windows launcher seeds an empty volume from the bundled Win64 client on
+first use and reuses existing SteamCMD installations.
 On Linux, `steamcmd` invokes Valve's launch script with the native 64-bit client,
 so self-updates can restart the client before running the requested commands.
+Both builds refresh their bundled clients when Valve's update manifests change.
 
 ## Credentials and timeouts
 

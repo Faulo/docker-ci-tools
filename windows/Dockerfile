@@ -66,7 +66,8 @@ RUN foreach ($command in @('steam-buildfile', 'steam-login')) { \
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine'); \
     [Environment]::SetEnvironmentVariable('Path', ('C:\ci-tools\bin;' + $machinePath), 'Machine')
 
-# SteamCMD is installed into its persistent volume on first use.
+# Keep the VOLUME destination empty and refresh the seed when Valve updates the client.
+ADD https://client-update.steamstatic.com/steam_cmd_win64 C:/steamcmd/steamcmd-manifest
 # hadolint shell=powershell
 RUN $archive = 'C:\steamcmd.zip'; \
     Invoke-WebRequest -Uri 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip' -OutFile $archive; \
@@ -77,6 +78,16 @@ RUN $archive = 'C:\steamcmd.zip'; \
     if ($installerFiles.Count -ne 1 -or $installerFiles[0].FullName -ne $installer) { throw 'Unexpected SteamCMD archive contents' }; \
     Move-Item -LiteralPath $installer -Destination C:\steamcmd\steamcmd-installer.exe; \
     Remove-Item -LiteralPath $archive, $extractRoot -Recurse -Force; \
+    if (Test-Path -LiteralPath C:\steam) { throw 'SteamCMD seed requires an empty volume destination before bootstrap' }; \
+    & C:/steamcmd/steamcmd.exe +quit; \
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath C:/steam/package/steam_cmd_win64.manifest -PathType Leaf)) { throw 'SteamCMD bootstrap failed to install the Win64 client' }; \
+    foreach ($directory in 'appcache', 'config', 'logs') { \
+        $statePath = Join-Path C:/steam $directory; \
+        if (Test-Path -LiteralPath $statePath) { Remove-Item -LiteralPath $statePath -Recurse -Force }; \
+    }; \
+    Get-ChildItem -LiteralPath C:/steam -File -Force | Where-Object Extension -in '.old', '.delete' | Remove-Item -Force; \
+    Remove-Item -LiteralPath C:/steam/.steamcmd.lock, C:/steamcmd/steamcmd-manifest -Force; \
+    Move-Item -LiteralPath C:/steam -Destination C:/steamcmd/seed; \
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine'); \
     [Environment]::SetEnvironmentVariable('Path', 'C:\steamcmd;' + $machinePath, 'Machine'); \
     if (Test-Path -LiteralPath C:\steam) { throw 'SteamCMD volume directory must not be populated in the image' }
